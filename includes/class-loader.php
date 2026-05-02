@@ -112,6 +112,12 @@ class Loader
         // ---- REST API (Webhooks) ----
         $this->add_filter('rest_api_init', new \POD_Aggregator\REST\Controller(), 'register_routes');
 
+        // ---- POD Design REST API (Customizer) ----
+        $this->add_filter('rest_api_init', new \POD_Aggregator\ProductCustomizer\REST_Controller(), 'register_routes');
+
+        // ---- POD Design CPT (registered on 'init') ----
+        $this->add_filter('init', new \POD_Aggregator\ProductCustomizer\Design_Storage(), 'register_post_type');
+
         // ---- WooCommerce integration hooks ----
         $wc = new \POD_Aggregator\WooCommerce\Integration();
         // Add product data tab on WooCommerce product edit screen.

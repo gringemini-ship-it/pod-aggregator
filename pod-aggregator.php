@@ -50,6 +50,11 @@ function pod_aggregator_load()
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-cpt-registrar.php';
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/providers/class-printful.php';
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/WooCommerce/class-integration.php';
+    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-design-element.php';
+    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-design.php';
+    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-design-storage.php';
+    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-print-generator.php';
+    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-rest-controller.php';
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/REST/class-controller.php';
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/Crons/class-scheduler.php';
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-ajax.php';
