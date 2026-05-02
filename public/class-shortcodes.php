@@ -15,9 +15,9 @@ namespace POD_Aggregator\Public;
 class Shortcodes
 {
     /**
-     * Render the POD product customizer.
+     * Render the POD product customizer using the Fabric.js canvas editor.
      *
-     * Shortcode: [pod_customizer product_id="123" provider="printful"]
+     * Shortcode: [pod_customizer product_id="123" area="front" design_uuid=""]
      *
      * @param array $atts Shortcode attributes.
      * @return string
@@ -25,162 +25,25 @@ class Shortcodes
     public function render_customizer(array $atts): string
     {
         $atts = shortcode_atts([
-            'product_id' => '',
-            'provider'   => 'printful',
-            'variant_id' => '',
+            'product_id'  => '',
+            'area'        => 'front',
+            'design_uuid' => '',
         ], $atts, 'pod_customizer');
 
         if (empty($atts['product_id'])) {
             return '<p class="pod-error">' . esc_html__('POD customizer: product_id is required.', 'pod-aggregator') . '</p>';
         }
 
-        $provider = \POD_Aggregator\pod_aggregator_get_provider($atts['provider']);
-        if (!$provider || !$provider->is_configured()) {
-            return '<p class="pod-error">' . esc_html__('POD customizer: provider not configured.', 'pod-aggregator') . '</p>';
-        }
+        $product_id = absint($atts['product_id']);
+        $area       = sanitize_key($atts['area']);
+        $design_uuid = sanitize_key($atts['design_uuid']);
 
-        // Enqueue frontend assets.
-        $this->enqueue_assets();
+        // Enqueue the editor assets.
+        $editor = new \POD_Aggregator\Public\POD_Customizer_Editor();
+        $editor->enqueue_assets();
 
-        // Fetch product info for display.
-        $product = $provider->get_product($atts['product_id']);
-        if (is_wp_error($product)) {
-            return '<p class="pod-error">' . esc_html__('POD customizer: could not load product.', 'pod-aggregator') . '</p>';
-        }
-
-        $variants    = $product['variants'] ?? [];
-        $mockups     = $provider->get_mockups($atts['product_id']);
-        $design_data = $product['files'] ?? [];
-
-        ob_start();
-        ?>
-        <div class="pod-customizer" id="pod-customizer-<?php echo esc_attr($atts['product_id']); ?>">
-            <div class="pod-customizer-layout">
-                <div class="pod-customizer-preview">
-                    <?php if (!empty($mockups)): ?>
-                        <img
-                            src="<?php echo esc_url($mockups[0]['url']); ?>"
-                            alt="<?php echo esc_attr($product['name'] ?? 'Product'); ?>"
-                            class="pod-mockup-image"
-                            id="pod-mockup-<?php echo esc_attr($atts['product_id']); ?>"
-                        />
-                    <?php else: ?>
-                        <div class="pod-no-mockup">
-                            <?php esc_html_e('No preview available.', 'pod-aggregator'); ?>
-                        </div>
-                    <?php endif; ?>
-
-                    <div class="pod-design-canvas-container">
-                        <canvas id="pod-design-canvas-<?php echo esc_attr($atts['product_id']); ?>" width="400" height="400"></canvas>
-                    </div>
-                </div>
-
-                <div class="pod-customizer-controls">
-                    <h3 class="pod-product-name"><?php echo esc_html($product['name'] ?? 'Customize Product'); ?></h3>
-
-                    <?php if (!empty($variants)): ?>
-                        <div class="pod-variants">
-                            <label for="pod-variant-<?php echo esc_attr($atts['product_id']); ?>">
-                                <?php esc_html_e('Select Variant:', 'pod-aggregator'); ?>
-                            </label>
-                            <select
-                                name="pod_variant"
-                                id="pod-variant-<?php echo esc_attr($atts['product_id']); ?>"
-                                class="pod-variant-select"
-                                data-product-id="<?php echo esc_attr($atts['product_id']); ?>"
-                                data-provider="<?php echo esc_attr($atts['provider']); ?>"
-                            >
-                                <?php foreach ($variants as $v): ?>
-                                    <option
-                                        value="<?php echo esc_attr($v['variant_id']); ?>"
-                                        data-price="<?php echo esc_attr($v['price']); ?>"
-                                        data-cost="<?php echo esc_attr($v['cost']); ?>"
-                                    >
-                                        <?php
-                                        echo esc_html(
-                                            $v['name'] . ' — ' . wc_price((float) $v['price'])
-                                        );
-                                        ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                    <?php endif; ?>
-
-                    <div class="pod-text-fields">
-                        <label for="pod-text-front-<?php echo esc_attr($atts['product_id']); ?>">
-                            <?php esc_html_e('Text (Front):', 'pod-aggregator'); ?>
-                        </label>
-                        <input
-                            type="text"
-                            id="pod-text-front-<?php echo esc_attr($atts['product_id']); ?>"
-                            class="pod-text-input"
-                            placeholder="<?php esc_attr_e('Enter text for front...', 'pod-aggregator'); ?>"
-                            maxlength="50"
-                            data-position="front"
-                        />
-
-                        <label for="pod-text-back-<?php echo esc_attr($atts['product_id']); ?>">
-                            <?php esc_html_e('Text (Back):', 'pod-aggregator'); ?>
-                        </label>
-                        <input
-                            type="text"
-                            id="pod-text-back-<?php echo esc_attr($atts['product_id']); ?>"
-                            class="pod-text-input"
-                            placeholder="<?php esc_attr_e('Enter text for back...', 'pod-aggregator'); ?>"
-                            maxlength="50"
-                            data-position="back"
-                        />
-                    </div>
-
-                    <div class="pod-image-upload">
-                        <label>
-                            <?php esc_html_e('Upload Image:', 'pod-aggregator'); ?>
-                        </label>
-                        <input
-                            type="file"
-                            id="pod-image-<?php echo esc_attr($atts['product_id']); ?>"
-                            class="pod-image-input"
-                            accept="image/*"
-                            data-product-id="<?php echo esc_attr($atts['product_id']); ?>"
-                        />
-                        <p class="description">
-                            <?php esc_html_e('PNG or JPG, max 5MB. For best results use a transparent PNG.', 'pod-aggregator'); ?>
-                        </p>
-                    </div>
-
-                    <div class="pod-preview-area">
-                        <button type="button" class="button" id="pod-update-preview-<?php echo esc_attr($atts['product_id']); ?>">
-                            <?php esc_html_e('Update Preview', 'pod-aggregator'); ?>
-                        </button>
-                    </div>
-
-                    <input
-                        type="hidden"
-                        name="pod_design_data"
-                        id="pod-design-data-<?php echo esc_attr($atts['product_id']); ?>"
-                        value=""
-                    />
-
-                    <button
-                        type="button"
-                        class="button alt"
-                        id="pod-add-to-cart-<?php echo esc_attr($atts['product_id']); ?>"
-                        data-product-id="<?php echo esc_attr($atts['product_id']); ?>"
-                        data-variant-id="<?php echo esc_attr($atts['variant_id'] ?: ($variants[0]['variant_id'] ?? '')); ?>"
-                        data-provider="<?php echo esc_attr($atts['provider']); ?>"
-                    >
-                        <?php esc_html_e('Add to Cart', 'pod-aggregator'); ?>
-                    </button>
-                </div>
-            </div>
-        </div>
-        <?php
-
-        // Add inline script for this product.
-        $this->inline_product_script($atts['product_id']);
-
-        return ob_get_clean();
+        // Render the editor UI.
+        return $editor->render_editor($product_id, $area, $design_uuid);
     }
 
     /**

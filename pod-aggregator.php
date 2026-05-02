@@ -67,6 +67,7 @@ function pod_aggregator_load()
 
     // Frontend only.
     if (!is_admin()) {
+        require_once POD_AGGREGATOR_PLUGIN_DIR . 'public/class-customizer-editor.php';
         require_once POD_AGGREGATOR_PLUGIN_DIR . 'public/class-shortcodes.php';
     }
 

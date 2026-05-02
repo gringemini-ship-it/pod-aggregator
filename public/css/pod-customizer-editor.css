@@ -1,0 +1,491 @@
+/**
+ * POD Aggregator — Customizer Editor Styles
+ *
+ * @package POD_Aggregator\Public
+ */
+
+/* -------------------------------------------------------------------------- */
+/* Variables
+/* -------------------------------------------------------------------------- */
+
+:root {
+    --pod-primary:      #2271b1;
+    --pod-primary-dark: #135e96;
+    --pod-danger:       #dc3232;
+    --pod-success:      #00a32a;
+    --pod-bg:           #f0f0f1;
+    --pod-panel-bg:     #ffffff;
+    --pod-border:       #c3c4c7;
+    --pod-text:         #1d2327;
+    --pod-text-muted:   #646970;
+    --pod-radius:       4px;
+    --pod-font:         -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Container
+/* -------------------------------------------------------------------------- */
+
+.pod-customizer {
+    font-family: var(--pod-font);
+    font-size: 14px;
+    color: var(--pod-text);
+    background: var(--pod-bg);
+    border: 1px solid var(--pod-border);
+    border-radius: var(--pod-radius);
+    overflow: hidden;
+    margin: 20px 0;
+    box-sizing: border-box;
+}
+
+.pod-customizer *, .pod-customizer *::before, .pod-customizer *::after {
+    box-sizing: border-box;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Toolbar
+/* -------------------------------------------------------------------------- */
+
+.pod-customizer__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    background: var(--pod-panel-bg);
+    border-bottom: 1px solid var(--pod-border);
+    flex-wrap: wrap;
+}
+
+.pod-customizer__tool-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.pod-customizer__tool-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--pod-border);
+    margin: 0 6px;
+}
+
+.pod-customizer__tool-spacer {
+    flex: 1;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Tool buttons
+/* -------------------------------------------------------------------------- */
+
+.pod-tool-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 8px;
+    border: 1px solid var(--pod-border);
+    border-radius: var(--pod-radius);
+    background: var(--pod-panel-bg);
+    color: var(--pod-text);
+    cursor: pointer;
+    font-size: 13px;
+    font-family: var(--pod-font);
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.pod-tool-btn:hover {
+    background: var(--pod-bg);
+    border-color: var(--pod-primary);
+}
+
+.pod-tool-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.pod-tool-btn--active,
+.pod-tool-btn[aria-pressed="true"] {
+    background: var(--pod-primary);
+    border-color: var(--pod-primary);
+    color: #fff;
+}
+
+.pod-tool-btn--primary {
+    background: var(--pod-primary);
+    border-color: var(--pod-primary-dark);
+    color: #fff;
+}
+
+.pod-tool-btn--primary:hover {
+    background: var(--pod-primary-dark);
+}
+
+.pod-tool-btn--danger {
+    color: var(--pod-danger);
+}
+
+.pod-tool-btn--danger:hover {
+    background: #fbeaea;
+    border-color: var(--pod-danger);
+}
+
+.pod-tool-btn__label {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Workspace (toolbar + panels)
+// /* -------------------------------------------------------------------------- */
+
+.pod-customizer__workspace {
+    display: flex;
+    min-height: 500px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Layers panel
+/* -------------------------------------------------------------------------- */
+
+.pod-customizer__layers {
+    width: 180px;
+    min-width: 180px;
+    background: var(--pod-panel-bg);
+    border-right: 1px solid var(--pod-border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.pod-customizer__panel-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--pod-text-muted);
+    border-bottom: 1px solid var(--pod-border);
+    background: var(--pod-bg);
+}
+
+.pod-customizer__layers-list {
+    list-style: none;
+    margin: 0;
+    padding: 6px 0;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.pod-layers-empty {
+    padding: 16px 12px;
+    text-align: center;
+    color: var(--pod-text-muted);
+    font-size: 13px;
+}
+
+.pod-layer-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    border-left: 3px solid transparent;
+    transition: background 0.1s;
+}
+
+.pod-layer-item:hover {
+    background: var(--pod-bg);
+}
+
+.pod-layer-item.active {
+    background: #e8f0fe;
+    border-left-color: var(--pod-primary);
+}
+
+.pod-layer-icon {
+    display: flex;
+    align-items: center;
+    color: var(--pod-text-muted);
+    flex-shrink: 0;
+}
+
+.pod-layer-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pod-layer-visibility {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--pod-text-muted);
+    cursor: pointer;
+    border-radius: 2px;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.pod-layer-visibility:hover {
+    background: var(--pod-bg);
+    color: var(--pod-text);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Canvas area
+/* -------------------------------------------------------------------------- */
+
+.pod-customizer__canvas-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    overflow: auto;
+    background: #e8e8e8;
+}
+
+.pod-customizer__print-area-hint {
+    font-size: 12px;
+    color: var(--pod-text-muted);
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.pod-customizer__canvas-frame {
+    background: #fff;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+    position: relative;
+    line-height: 0;
+}
+
+#pod-canvas {
+    display: block;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Properties panel
+/* -------------------------------------------------------------------------- */
+
+.pod-customizer__properties {
+    width: 240px;
+    min-width: 240px;
+    background: var(--pod-panel-bg);
+    border-left: 1px solid var(--pod-border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.pod-customizer__no-selection {
+    padding: 20px 12px;
+    color: var(--pod-text-muted);
+    font-size: 13px;
+    text-align: center;
+}
+
+.pod-customizer__props-content {
+    overflow-y: auto;
+    flex: 1;
+    padding: 8px;
+}
+
+.pod-prop-group {
+    margin-bottom: 12px;
+}
+
+.pod-prop-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--pod-text-muted);
+    margin-bottom: 4px;
+}
+
+.pod-prop-textarea {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 13px;
+    font-family: var(--pod-font);
+    border: 1px solid var(--pod-border);
+    border-radius: var(--pod-radius);
+    resize: vertical;
+    min-height: 60px;
+}
+
+.pod-prop-textarea:focus {
+    outline: none;
+    border-color: var(--pod-primary);
+    box-shadow: 0 0 0 1px var(--pod-primary);
+}
+
+.pod-prop-select {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 13px;
+    font-family: var(--pod-font);
+    border: 1px solid var(--pod-border);
+    border-radius: var(--pod-radius);
+    background: #fff;
+}
+
+.pod-prop-row--inline {
+    display: flex;
+    gap: 8px;
+}
+
+.pod-prop-half {
+    flex: 1;
+}
+
+.pod-prop-number {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 13px;
+    font-family: var(--pod-font);
+    border: 1px solid var(--pod-border);
+    border-radius: var(--pod-radius);
+}
+
+.pod-prop-color {
+    width: 100%;
+    padding: 4px 6px;
+    height: 32px;
+    font-size: 13px;
+    font-family: var(--pod-font);
+    border: 1px solid var(--pod-border);
+    border-radius: var(--pod-radius);
+    cursor: pointer;
+}
+
+.pod-prop-btn-group {
+    display: flex;
+    gap: 4px;
+}
+
+.pod-prop-toggle {
+    flex: 1;
+    padding: 6px 0;
+    border: 1px solid var(--pod-border);
+    border-radius: var(--pod-radius);
+    background: var(--pod-panel-bg);
+    cursor: pointer;
+    font-size: 13px;
+    font-family: var(--pod-font);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--pod-text);
+    transition: background 0.15s;
+}
+
+.pod-prop-toggle:hover {
+    background: var(--pod-bg);
+}
+
+.pod-prop-toggle.active {
+    background: var(--pod-primary);
+    border-color: var(--pod-primary);
+    color: #fff;
+}
+
+.pod-prop-action {
+    flex: 1;
+    padding: 4px 2px;
+    border: 1px solid var(--pod-border);
+    border-radius: var(--pod-radius);
+    background: var(--pod-panel-bg);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--pod-text-muted);
+    transition: background 0.15s;
+}
+
+.pod-prop-action:hover {
+    background: var(--pod-bg);
+    color: var(--pod-text);
+}
+
+.pod-prop-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--pod-border);
+    border-radius: var(--pod-radius);
+    background: var(--pod-panel-bg);
+    cursor: pointer;
+    font-size: 13px;
+    font-family: var(--pod-font);
+    color: var(--pod-text);
+    transition: background 0.15s;
+}
+
+.pod-prop-btn:hover {
+    background: var(--pod-bg);
+}
+
+.pod-prop-btn--toggle {
+    justify-content: flex-start;
+}
+
+.pod-prop-btn--danger {
+    color: var(--pod-danger);
+    border-color: #f0c0c0;
+}
+
+.pod-prop-btn--danger:hover {
+    background: #fbeaea;
+}
+
+/* -------------------------------------------------------------------------- */
+/* WP Color Picker override
+/* -------------------------------------------------------------------------- */
+
+.wp-color-result {
+    height: 28px;
+    border-radius: var(--pod-radius);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Responsive
+/* -------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+    .pod-customizer__workspace {
+        flex-direction: column;
+    }
+
+    .pod-customizer__layers,
+    .pod-customizer__properties {
+        width: 100%;
+        min-width: unset;
+        max-height: 200px;
+    }
+
+    .pod-customizer__layers {
+        border-right: none;
+        border-bottom: 1px solid var(--pod-border);
+    }
+
+    .pod-customizer__properties {
+        border-left: none;
+        border-top: 1px solid var(--pod-border);
+    }
+}
