@@ -1,0 +1,179 @@
+/**
+ * POD Aggregator — Frontend Styles
+ *
+ * @package POD_Aggregator
+ */
+
+.pod-customizer {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 900px;
+    margin: 30px auto;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid #e2e4e7;
+    border-radius: 4px;
+}
+
+.pod-customizer-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    align-items: start;
+}
+
+@media (max-width: 640px) {
+    .pod-customizer-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.pod-customizer-preview {
+    position: relative;
+    text-align: center;
+}
+
+.pod-mockup-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
+
+.pod-design-canvas-container {
+    margin-top: 10px;
+}
+
+.pod-design-canvas-container canvas {
+    border: 1px dashed #ccc;
+    border-radius: 4px;
+    max-width: 100%;
+}
+
+.pod-no-mockup {
+    padding: 40px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    color: #666;
+}
+
+.pod-customizer-controls {
+    padding: 10px 0;
+}
+
+.pod-product-name {
+    margin: 0 0 15px;
+    font-size: 1.2em;
+}
+
+.pod-variants,
+.pod-text-fields,
+.pod-image-upload,
+.pod-preview-area {
+    margin-bottom: 15px;
+}
+
+.pod-variants label,
+.pod-text-fields label,
+.pod-image-upload label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.pod-variant-select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+.pod-text-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+}
+
+.pod-image-input {
+    display: block;
+    margin-top: 5px;
+}
+
+.pod-error {
+    color: #d63638;
+    padding: 10px;
+    background: #fcf0f1;
+    border: 1px solid #d63638;
+    border-radius: 3px;
+}
+
+.pod-info {
+    color: #2271b1;
+    padding: 10px;
+    background: #f0f6fc;
+    border: 1px solid #2271b1;
+    border-radius: 3px;
+}
+
+/* Catalog Grid */
+.pod-catalog-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.pod-catalog-item {
+    border: 1px solid #e2e4e7;
+    border-radius: 4px;
+    padding: 15px;
+    text-align: center;
+    background: #fff;
+}
+
+.pod-catalog-thumb {
+    max-width: 100%;
+    height: auto;
+    margin-bottom: 10px;
+}
+
+.pod-catalog-placeholder {
+    height: 150px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f5f5f5;
+    color: #999;
+    margin-bottom: 10px;
+    border-radius: 4px;
+}
+
+.pod-catalog-title {
+    font-size: 1em;
+    margin: 0 0 8px;
+    min-height: 2.5em;
+}
+
+.pod-catalog-price {
+    color: #555;
+    margin: 0 0 10px;
+}
+
+.pod-catalog-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+/* WooCommerce cart item customization display */
+.pod-cart-item-customization {
+    font-size: 0.85em;
+    color: #555;
+    background: #f5f5f5;
+    padding: 5px 8px;
+    border-radius: 3px;
+    margin-top: 5px;
+}

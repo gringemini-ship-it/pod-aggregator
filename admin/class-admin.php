@@ -1,0 +1,359 @@
+<?php
+/**
+ * POD Aggregator — Network Admin Menu.
+ *
+ * @package POD_Aggregator\Admin
+ */
+
+namespace POD_Aggregator\Admin;
+
+/**
+ * Adds the top-level network admin menu and submenu pages.
+ *
+ * @since 1.0.0
+ */
+class Admin
+{
+    /**
+     * Add network admin menu pages.
+     *
+     * @return void
+     */
+    public function add_menu_pages()
+    {
+        // Top-level menu.
+        add_menu_page(
+            __('POD Aggregator', 'pod-aggregator'),
+            __('POD Aggregator', 'pod-aggregator'),
+            'manage_network',
+            'pod-aggregator',
+            [$this, 'render_dashboard_page'],
+            'dashicons-images-alt',
+            56
+        );
+
+        // Dashboard submenu.
+        add_submenu_page(
+            'pod-aggregator',
+            __('Dashboard', 'pod-aggregator'),
+            __('Dashboard', 'pod-aggregator'),
+            'manage_network',
+            'pod-aggregator',
+            [$this, 'render_dashboard_page']
+        );
+
+        // Products submenu.
+        add_submenu_page(
+            'pod-aggregator',
+            __('POD Products', 'pod-aggregator'),
+            __('POD Products', 'pod-aggregator'),
+            'manage_network',
+            'edit.php?post_type=pod_product',
+            null
+        );
+
+        // Settings submenu.
+        add_submenu_page(
+            'pod-aggregator',
+            __('Settings', 'pod-aggregator'),
+            __('Settings', 'pod-aggregator'),
+            'manage_network',
+            'pod-aggregator-settings',
+            [$this, 'render_settings_page']
+        );
+
+        // Sync Log submenu.
+        add_submenu_page(
+            'pod-aggregator',
+            __('Sync Log', 'pod-aggregator'),
+            __('Sync Log', 'pod-aggregator'),
+            'manage_network',
+            'pod-aggregator-sync-log',
+            [$this, 'render_sync_log_page']
+        );
+    }
+
+    /**
+     * Render the dashboard page.
+     *
+     * @return void
+     */
+    public function render_dashboard_page()
+    {
+        $printful_connected = false;
+        $provider = null;
+
+        try {
+            $provider = \POD_Aggregator\pod_aggregator_get_provider('printful');
+            $printful_connected = $provider && $provider->is_configured();
+        } catch (\Throwable $e) {
+            // Ignore.
+        }
+
+        $stats = $this->get_sync_stats();
+        $schedules = $this->get_cron_schedules();
+
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e('POD Aggregator Dashboard', 'pod-aggregator'); ?></h1>
+
+            <div class="notice notice-info">
+                <p>
+                    <strong><?php esc_html_e('Welcome to POD Aggregator!', 'pod-aggregator'); ?></strong>
+                    <?php esc_html_e('Connect your store to Print-on-Demand providers to sync products and automate fulfillment.', 'pod-aggregator'); ?>
+                </p>
+            </div>
+
+            <div class="card" style="max-width:600px; margin-top:20px;">
+                <h2><?php esc_html_e('Provider Status', 'pod-aggregator'); ?></h2>
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th><?php esc_html_e('Provider', 'pod-aggregator'); ?></th>
+                            <th><?php esc_html_e('Status', 'pod-aggregator'); ?></th>
+                            <th><?php esc_html_e('Actions', 'pod-aggregator'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Printful</strong></td>
+                            <td>
+                                <?php if ($printful_connected): ?>
+                                    <span style="color:green;">&#10003; <?php esc_html_e('Connected', 'pod-aggregator'); ?></span>
+                                <?php else: ?>
+                                    <span style="color:red;">&#10007; <?php esc_html_e('Not configured', 'pod-aggregator'); ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <a href="<?php echo esc_url(network_admin_url('admin.php?page=pod-aggregator-settings')); ?>" class="button">
+                                    <?php esc_html_e('Configure', 'pod-aggregator'); ?>
+                                </a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card" style="max-width:600px; margin-top:20px;">
+                <h2><?php esc_html_e('Sync Statistics', 'pod-aggregator'); ?></h2>
+                <table class="widefat">
+                    <tbody>
+                        <tr>
+                            <td><?php esc_html_e('Total sync events', 'pod-aggregator'); ?></td>
+                            <td><?php echo esc_html($stats['total'] ?? 0); ?></td>
+                        </tr>
+                        <tr>
+                            <td><?php esc_html_e('Successful', 'pod-aggregator'); ?></td>
+                            <td><?php echo esc_html($stats['success'] ?? 0); ?></td>
+                        </tr>
+                        <tr>
+                            <td><?php esc_html_e('Failed', 'pod-aggregator'); ?></td>
+                            <td><?php echo esc_html($stats['error'] ?? 0); ?></td>
+                        </tr>
+                        <tr>
+                            <td><?php esc_html_e('Product sync schedule', 'pod-aggregator'); ?></td>
+                            <td><?php echo esc_html($schedules['products'] ?? 'Every 6 hours'); ?></td>
+                        </tr>
+                        <tr>
+                            <td><?php esc_html_e('Order sync schedule', 'pod-aggregator'); ?></td>
+                            <td><?php echo esc_html($schedules['orders'] ?? 'Every 15 minutes'); ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p>
+                    <a href="<?php echo esc_url(wp_nonce_url(network_admin_url('admin.php?page=pod-aggregator&action=sync_products'), 'pod_sync_products')); ?>" class="button">
+                        <?php esc_html_e('Sync Products Now', 'pod-aggregator'); ?>
+                    </a>
+                </p>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render the settings page.
+     *
+     * @return void
+     */
+    public function render_settings_page()
+    {
+        // Handled by Settings class via do_settings_sections.
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e('POD Aggregator Settings', 'pod-aggregator'); ?></h1>
+            <form action="<?php echo esc_url(network_admin_url('admin.php?page=pod-aggregator-settings')); ?>" method="post">
+                <?php
+                settings_fields('pod_aggregator_settings_group');
+                do_settings_sections('pod_aggregator_settings');
+                submit_button();
+                ?>
+            </form>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render the sync log page.
+     *
+     * @return void
+     */
+    public function render_sync_log_page()
+    {
+        global $wpdb;
+
+        $table = $wpdb->base_prefix . 'pod_aggregator_sync_log';
+
+        // Check if table exists.
+        if ($wpdb->get_var("SHOW TABLES LIKE '{$table}'") !== $table) {
+            echo '<div class="wrap"><p>' . esc_html__('Sync log table not found. Sync at least once.', 'pod-aggregator') . '</p></div>';
+            return;
+        }
+
+        $per_page = 20;
+        $page     = max(1, intval($_GET['paged'] ?? 1));
+        $offset   = ($page - 1) * $per_page;
+
+        $orderby  = sanitize_sql_orderby($_GET['orderby'] ?? 'created_at');
+        $order    = $_GET['order'] ?? 'DESC';
+        $status   = sanitize_text_field($_GET['status'] ?? '');
+
+        $where = '';
+        $args  = [];
+        if ($status) {
+            $where = 'WHERE status = %s';
+            $args[] = $status;
+        }
+
+        $total = (int) $wpdb->get_var(
+            $wpdb->prepare("SELECT COUNT(*) FROM {$table} {$where}", ...$args)
+        );
+
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM {$table} {$where} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d",
+                ...array_merge($args, [$per_page, $offset])
+            ),
+            ARRAY_A
+        );
+
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e('POD Sync Log', 'pod-aggregator'); ?></h1>
+
+            <form method="get">
+                <input type="hidden" name="page" value="pod-aggregator-sync-log" />
+                <label>
+                    <?php esc_html_e('Filter by status:', 'pod-aggregator'); ?>
+                    <select name="status">
+                        <option value=""><?php esc_html_e('All', 'pod-aggregator'); ?></option>
+                        <option value="success" <?php selected($status, 'success'); ?>><?php esc_html_e('Success', 'pod-aggregator'); ?></option>
+                        <option value="error" <?php selected($status, 'error'); ?>><?php esc_html_e('Error', 'pod-aggregator'); ?></option>
+                        <option value="pending" <?php selected($status, 'pending'); ?>><?php esc_html_e('Pending', 'pod-aggregator'); ?></option>
+                    </select>
+                </label>
+                <button type="submit" class="button"><?php esc_html_e('Filter', 'pod-aggregator'); ?></button>
+            </form>
+
+            <table class="widefat" style="margin-top:15px;">
+                <thead>
+                    <tr>
+                        <th><?php esc_html_e('ID', 'pod-aggregator'); ?></th>
+                        <th><?php esc_html_e('Provider', 'pod-aggregator'); ?></th>
+                        <th><?php esc_html_e('Event', 'pod-aggregator'); ?></th>
+                        <th><?php esc_html_e('External ID', 'pod-aggregator'); ?></th>
+                        <th><?php esc_html_e('Order ID', 'pod-aggregator'); ?></th>
+                        <th><?php esc_html_e('Status', 'pod-aggregator'); ?></th>
+                        <th><?php esc_html_e('Created', 'pod-aggregator'); ?></th>
+                        <th><?php esc_html_e('Error', 'pod-aggregator'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($rows)): ?>
+                        <tr><td colspan="8"><?php esc_html_e('No sync events found.', 'pod-aggregator'); ?></td></tr>
+                    <?php else: ?>
+                        <?php foreach ($rows as $row): ?>
+                            <tr>
+                                <td><?php echo esc_html($row['id']); ?></td>
+                                <td><?php echo esc_html($row['provider']); ?></td>
+                                <td><?php echo esc_html($row['event_type']); ?></td>
+                                <td><?php echo esc_html($row['external_id'] ?? ''); ?></td>
+                                <td><?php echo esc_html($row['order_id'] ?? ''); ?></td>
+                                <td>
+                                    <?php
+                                    $badge_color = $row['status'] === 'success' ? 'green' : ($row['status'] === 'error' ? 'red' : 'gray');
+                                    printf(
+                                        '<span style="color:%s">%s</span>',
+                                        esc_attr($badge_color),
+                                        esc_html($row['status'])
+                                    );
+                                    ?>
+                                </td>
+                                <td><?php echo esc_html($row['created_at']); ?></td>
+                                <td><?php echo esc_html($row['error_message'] ?? ''); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+
+            <?php if ($total > $per_page): ?>
+                <p>
+                    <?php
+                    printf(
+                        /* translators: %1$d = start, %2$d = end, %3$d = total */
+                        esc_html__('Showing %1$d–%2$d of %3$d results', 'pod-aggregator'),
+                        $offset + 1,
+                        min($offset + $per_page, $total),
+                        $total
+                    );
+                    ?>
+                </p>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * Register settings (placeholder — actual fields are in Settings class).
+     *
+     * @return void
+     */
+    public function register_settings()
+    {
+        // Settings fields are registered by the Settings class.
+    }
+
+    /**
+     * Get sync statistics from the log table.
+     *
+     * @return array
+     */
+    private function get_sync_stats(): array
+    {
+        global $wpdb;
+        $table = $wpdb->base_prefix . 'pod_aggregator_sync_log';
+
+        if ($wpdb->get_var("SHOW TABLES LIKE '{$table}'") !== $table) {
+            return ['total' => 0, 'success' => 0, 'error' => 0];
+        }
+
+        return [
+            'total'  => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table}"),
+            'success' => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE status = 'success'"),
+            'error'   => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table} WHERE status = 'error'"),
+        ];
+    }
+
+    /**
+     * Get current cron schedule descriptions.
+     *
+     * @return array
+     */
+    private function get_cron_schedules(): array
+    {
+        return [
+            'products' => __('Every 6 hours', 'pod-aggregator'),
+            'orders'   => __('Every 15 minutes', 'pod-aggregator'),
+        ];
+    }
+}
