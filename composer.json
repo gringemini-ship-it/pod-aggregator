@@ -1,0 +1,34 @@
+{
+    "name": "pod-aggregator/print-on-demand-aggregator",
+    "description": "Connect your WordPress store to multiple Print-on-Demand providers (Printful, Printify, Gelato).",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=7.4"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6",
+        "yoast/phpunit-polyfills": "^2.0",
+        "phpunit/phpunit-polyfills": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "POD_Aggregator\\": "includes/",
+            "POD_Aggregator\\Provider\\": "includes/providers/",
+            "POD_Aggregator\\WooCommerce\\": "includes/WooCommerce/",
+            "POD_Aggregator\\ProductCustomizer\\": "includes/product-customizer/",
+            "POD_Aggregator\\REST\\": "includes/REST/",
+            "POD_Aggregator\\Crons\\": "includes/Crons/",
+            "POD_Aggregator\\Admin\\": "admin/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test:coverage": "phpunit --coverage-html coverage",
+        "test:unit": "phpunit --testsuite=unit",
+        "test:integration": "phpunit --testsuite=integration",
+        "lint": "phpcs --standard=PSR12 includes/ admin/ public/",
+        "lint:fix": "phpcbf --standard=PSR12 includes/ admin/ public/",
+        "autoload": "composer dump-autoload"
+    }
+}
