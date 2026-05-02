@@ -282,6 +282,7 @@ class Integration
             $pod_items[] = [
                 'provider_product_id' => $item->get_meta('_pod_variant_id', true),
                 'variant_id'           => $item->get_meta('_pod_variant_id', true),
+                'provider'             => $item->get_meta('_pod_provider', true),
                 'qty'                  => $item->get_quantity(),
                 'design_data'          => json_decode($item->get_meta('_pod_design_data', true), true),
                 'item_id'              => $item_id,
@@ -292,8 +293,8 @@ class Integration
             return;
         }
 
-        // Get the correct provider adapter.
-        $provider_slug = $pod_items[0]['provider_product_id'] ? 'printful' : 'printful'; // default
+        // Get the correct provider adapter from the first cart item.
+        $provider_slug = !empty($pod_items[0]['provider']) ? $pod_items[0]['provider'] : 'printful';
         $provider      = pod_aggregator_get_provider($provider_slug);
 
         if (!$provider || !$provider->is_configured()) {
@@ -386,9 +387,10 @@ class Integration
             if ($item->get_meta('_pod_provider', true)) {
                 $pod_items[] = [
                     'provider_product_id' => $item->get_meta('_pod_variant_id', true),
-                    'variant_id'         => $item->get_meta('_pod_variant_id', true),
-                    'qty'                => $item->get_quantity(),
-                    'design_data'        => json_decode($item->get_meta('_pod_design_data', true), true),
+                    'variant_id'           => $item->get_meta('_pod_variant_id', true),
+                    'provider'             => $item->get_meta('_pod_provider', true),
+                    'qty'                  => $item->get_quantity(),
+                    'design_data'          => json_decode($item->get_meta('_pod_design_data', true), true),
                 ];
             }
         }

@@ -28,10 +28,11 @@ class Controller
     public function register_routes()
     {
         // Printful webhook.
+        // POST only; signature is verified in the callback.
         register_rest_route(self::REST_NAMESPACE, '/webhook/printful', [
             'methods'             => 'POST',
             'callback'            => [$this, 'handle_printful_webhook'],
-            'permission_callback' => '__return_true', // Signature validated internally.
+            'permission_callback' => [$this, 'webhook_permission'],
             'show_in_index'       => false,
         ]);
 
@@ -39,7 +40,7 @@ class Controller
         register_rest_route(self::REST_NAMESPACE, '/webhook/(?P<provider>[a-z]+)', [
             'methods'             => 'POST',
             'callback'            => [$this, 'handle_provider_webhook'],
-            'permission_callback' => '__return_true',
+            'permission_callback' => [$this, 'webhook_permission'],
             'show_in_index'       => false,
             'args'                => [
                 'provider' => [
@@ -48,6 +49,22 @@ class Controller
                 ],
             ],
         ]);
+    }
+
+    /**
+     * Permission check for all webhook routes.
+     * Allows POST requests; signature validation is done per-provider in the handler.
+     *
+     * @param \WP_REST_Request $request
+     * @return bool
+     */
+    public function webhook_permission(\WP_REST_Request $request): bool
+    {
+        // Reject any non-POST method (belt-and-suspenders; WP already enforces methods).
+        if ($request->get_method() !== 'POST') {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -211,13 +228,10 @@ class Controller
             $order = wc_get_order($order_id);
             if ($order && !empty($tracking)) {
                 $order->update_status('completed');
-                wc_update_order_item(
-                    $order_id,
-                    [
-                        'tracking_number' => $tracking,
-                        'carrier'         => $carrier,
-                    ]
-                );
+                $order->update_meta_data('_pod_tracking_number', $tracking);
+                $order->update_meta_data('_pod_tracking_carrier', $carrier);
+                $order->update_meta_data('_pod_tracking_url', $tracking_url);
+                $order->save();
                 $order->add_order_note(
                     sprintf(
                         /* translators: %1$s = provider, %2$s = carrier, %3$s = tracking number */

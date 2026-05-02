@@ -91,6 +91,14 @@ class Loader
         // ---- Core / Init ----
         $this->add_filter('init', new \POD_Aggregator\CPT_Registrar(), 'register_post_types');
 
+        // Deferred flush of rewrite rules after first 'init' (set by activation hook).
+        $this->add_action('init', function () {
+            if (get_site_transient('pod_aggregator_flush_rewrite')) {
+                delete_site_transient('pod_aggregator_flush_rewrite');
+                flush_rewrite_rules();
+            }
+        });
+
         // ---- Admin ----
         if (is_admin()) {
             $admin = new \POD_Aggregator\Admin\Admin();

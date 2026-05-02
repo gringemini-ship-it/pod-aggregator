@@ -48,11 +48,11 @@ function pod_aggregator_load()
     // Load our classes (order matters for dependencies).
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-pod-provider.php';
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-cpt-registrar.php';
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-loader.php';
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/providers/class-printful.php';
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/WooCommerce/class-integration.php';
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/REST/class-controller.php';
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/Crons/class-scheduler.php';
+    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-ajax.php';
 
     // Admin only.
     if (is_admin()) {
@@ -64,6 +64,9 @@ function pod_aggregator_load()
     if (!is_admin()) {
         require_once POD_AGGREGATOR_PLUGIN_DIR . 'public/class-shortcodes.php';
     }
+
+    // Load the loader after all classes are required.
+    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-loader.php';
 
     // Initialize the loader.
     $loader = new POD_Aggregator\Loader();
@@ -100,9 +103,13 @@ register_activation_hook(
             add_site_option('pod_aggregator_settings', []);
         }
 
-        // Flush rewrite rules (for CPT registrations).
-        // Rules are registered in the loader on 'init'.
-        pod_aggregator_flush_rewrite_rules();
+        // Schedule cron events.
+        // Note: flush_rewrite_rules() is deferred to 'init' via a separate
+        // hook — see below for the deferred approach.
+        \POD_Aggregator\Crons\Scheduler::schedule_crons();
+
+        // Set a transient flag so 'init' can flush rewrite rules once.
+        set_site_transient('pod_aggregator_flush_rewrite', true, 60);
     }
 );
 
@@ -118,8 +125,8 @@ register_deactivation_hook(
         wp_clear_scheduled_hook('pod_aggregator_sync_products');
         wp_clear_scheduled_hook('pod_aggregator_sync_orders');
 
-        // Flush rewrite rules.
-        pod_aggregator_flush_rewrite_rules();
+        // Flush rewrite rules directly — 'init' has already run by deactivation.
+        flush_rewrite_rules();
     }
 );
 
@@ -180,15 +187,3 @@ function pod_aggregator_create_tables()
 }
 
 /**
- * Flush rewrite rules safely.
- *
- * @return void
- */
-function pod_aggregator_flush_rewrite_rules()
-{
-    // Init runs first and registers CPTs, so we can safely flush after.
-    if (function_exists('pod_aggregator_register_post_types')) {
-        pod_aggregator_register_post_types();
-    }
-    flush_rewrite_rules();
-}
