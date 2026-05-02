@@ -77,6 +77,27 @@ const PODCustomizerEditor = (function ($) {
 
         // Initialize history.
         saveHistory();
+
+        // Templates modal close / apply.
+        $(document).on('click', '#pod-templates-modal-close, #pod-templates-modal .pod-templates-modal__backdrop', function (e) {
+            if (e.target !== this) return;
+            closeTemplatesModal();
+        });
+        $(document).on('click', '.pod-templates-modal__item', function () {
+            const raw = $(this).data('preset');
+            if (!raw) return;
+            try {
+                const data = JSON.parse(raw);
+                applyTemplate(data.design || data);
+            } catch (e) {
+                console.error('Invalid preset data', e);
+            }
+        });
+
+        // Add to cart bar.
+        $(document).on('click', '#pod-btn-save-and-cart', function () {
+            saveDesignAndAddToCart();
+        });
     }
 
     // -------------------------------------------------------------------------
@@ -185,6 +206,12 @@ const PODCustomizerEditor = (function ($) {
                     updateLayersPanel();
                     saveHistory();
                 }
+                break;
+            case 'templates':
+                openTemplatesModal();
+                break;
+            case 'ai-generate':
+                openAIGenerator();
                 break;
         }
     }
@@ -1055,6 +1082,276 @@ const PODCustomizerEditor = (function ($) {
         if (obj.type === 'image') return 'image';
         if (obj.podType === 'shape') return 'shape';
         return 'shape';
+    }
+
+    // -------------------------------------------------------------------------
+    // Template Gallery Modal (P3-A)
+    // -------------------------------------------------------------------------
+
+    let loadedTemplates = [];
+
+    function openTemplatesModal() {
+        const $modal = $('#pod-templates-modal');
+        $modal.show();
+        loadTemplates('');
+        // Tab switching
+        $('#pod-templates-tabs').off('click', '.pod-templates-modal__tab').on('click', '.pod-templates-modal__tab', function () {
+            $('#pod-templates-tabs .pod-templates-modal__tab').removeClass('active');
+            $(this).addClass('active');
+            loadTemplates($(this).data('category'));
+        });
+    }
+
+    function closeTemplatesModal() {
+        $('#pod-templates-modal').hide();
+    }
+
+    function loadTemplates(category) {
+        const $grid = $('#pod-templates-grid');
+        $grid.html('<div class="pod-templates-modal__loading">' + (PODCustomizer.i18n.saving || 'Loading...') + '</div>');
+
+        const url = PODCustomizer.presetsRestBase + (category ? `?category=${category}` : '');
+
+        $.ajax({
+            url: url,
+            method: 'GET',
+            headers: { 'X-WP-Nonce': PODCustomizer.restNonce },
+        }).done(function (response) {
+            const presets = response.presets || [];
+            loadedTemplates = presets;
+            if (!presets.length) {
+                $grid.html('<div class="pod-templates-modal__empty">' + (PODCustomizer.i18n.noElements || 'No templates found.') + '</div>');
+                return;
+            }
+            $grid.html(presets.map(function (p) {
+                const thumb = p.thumbnail
+                    ? `<img src="${p.thumbnail}" alt="${escAttr(p.name)}">`
+                    : `<div class="pod-templates-modal__item-placeholder"><span class="dashicons dashicons-format-image"></span></div>`;
+                return `
+                    <div class="pod-templates-modal__item" data-preset='${escAttr(JSON.stringify(p))}'>
+                        <div class="pod-templates-modal__item-thumb">${thumb}</div>
+                        <div class="pod-templates-modal__item-name">${escAttr(p.name)}</div>
+                    </div>`;
+            }).join(''));
+        }).fail(function () {
+            $grid.html('<div class="pod-templates-modal__empty">Error loading templates.</div>');
+        });
+    }
+
+    function applyTemplate(presetData) {
+        if (!presetData || !presetData.elements) return;
+        if (!confirm('Apply this template? Your current design will be replaced.')) return;
+        canvas.clear();
+        canvas.backgroundColor = '#ffffff';
+        loadCanvasFromDesign(presetData);
+        closeTemplatesModal();
+        showAddToCartBar(presetData.name || 'Template');
+    }
+
+    // -------------------------------------------------------------------------
+    // Add to Cart from Customizer (P3-B)
+    // -------------------------------------------------------------------------
+
+    function showAddToCartBar(designName) {
+        const $bar = $('#pod-add-to-cart-bar');
+        if (!$bar.length) return;
+        $('#pod-cart-design-name').text(designName || 'Unsaved design');
+        $bar.show();
+        $('#pod-btn-view-cart').hide();
+    }
+
+    function saveDesignAndAddToCart() {
+        const $btn = $('#pod-btn-save-and-cart');
+        const originalText = $btn.html();
+        $btn.html('<span class="dashicons dashicons-update"></span> ' + (PODCustomizer.i18n.savingCart || 'Adding...'));
+        $btn.prop('disabled', true);
+
+        // First save the design.
+        saveDesignForCart(function (uuid) {
+            if (!uuid) {
+                alert(PODCustomizer.i18n.cartError || 'Error');
+                $btn.html(originalText);
+                $btn.prop('disabled', false);
+                return;
+            }
+
+            // Generate preview thumbnail first.
+            generatePreviewThumb(function (thumbUrl) {
+                // Add to cart via AJAX.
+                $.ajax({
+                    url: PODCustomizer.ajaxUrl,
+                    method: 'POST',
+                    data: {
+                        action: 'pod_add_design_to_cart',
+                        nonce: PODCustomizer.nonce,
+                        design_uuid: uuid,
+                        product_id: productId,
+                        thumb_url: thumbUrl || '',
+                    },
+                }).done(function (r) {
+                    if (r.success && r.data.url) {
+                        $('#pod-btn-view-cart').attr('href', r.data.url).show();
+                        $btn.html('<span class="dashicons dashicons-yes"></span> ' + (PODCustomizer.i18n.addedCart || 'Added!'));
+                        showAddToCartBar($('#pod-cart-design-name').text());
+                    } else {
+                        alert(r.data.message || PODCustomizer.i18n.cartError);
+                        $btn.html(originalText);
+                        $btn.prop('disabled', false);
+                    }
+                }).fail(function () {
+                    alert(PODCustomizer.i18n.cartError || 'Error');
+                    $btn.html(originalText);
+                    $btn.prop('disabled', false);
+                });
+            });
+        });
+    }
+
+    /**
+     * Generate a preview thumbnail via the REST API, then call callback with URL.
+     */
+    function generatePreviewThumb(callback) {
+        if (!designUUID) {
+            callback('');
+            return;
+        }
+        $.ajax({
+            url: `${PODCustomizer.restBase}/${designUUID}/preview`,
+            method: 'POST',
+            data: JSON.stringify({ max_width: 300 }),
+            contentType: 'application/json',
+            headers: { 'X-WP-Nonce': PODCustomizer.restNonce },
+        }).done(function (r) {
+            callback(r.preview && r.preview.file_url ? r.preview.file_url : '');
+        }).fail(function () {
+            callback('');
+        });
+    }
+
+    /**
+     * Save design for cart flow — calls callback(uuid) when done.
+     * Does NOT show UI feedback (unlike toolbar saveDesign).
+     */
+    function saveDesignForCart(callback) {
+        const elements = serializeCanvasElements();
+        const payload = {
+            name:               `Design for Product ${productId}`,
+            area:               printArea,
+            product_id:         productId,
+            provider:           'printful',
+            provider_product_id: '',
+            dpi:                300,
+            elements:           elements,
+        };
+
+        const isUpdate = !!designUUID;
+        const method = isUpdate ? 'PUT' : 'POST';
+        const url = isUpdate
+            ? `${PODCustomizer.restBase}/${designUUID}`
+            : `${PODCustomizer.restBase}`;
+
+        $.ajax({
+            url:  url,
+            method: method,
+            data:   JSON.stringify(payload),
+            contentType: 'application/json',
+            headers: { 'X-WP-Nonce': PODCustomizer.restNonce },
+        }).done(function (response) {
+            if (!isUpdate && response.uuid) {
+                designUUID = response.uuid;
+                if (window.history && window.history.replaceState) {
+                    const newUrl = `${window.location.pathname}?design_uuid=${designUUID}`;
+                    window.history.replaceState({}, '', newUrl);
+                }
+            }
+            callback(designUUID);
+        }).fail(function () {
+            callback(null);
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // AI Generation Stub (P3-E)
+    // -------------------------------------------------------------------------
+
+    function openAIGenerator() {
+        const prompt = prompt('Enter a text prompt to generate a design idea:\n\nExample: "A bold red and black abstract logo for a coffee brand"');
+        if (!prompt || !prompt.trim()) return;
+
+        // Show generating state.
+        const $btn = $('.pod-tool-btn[data-action="ai-generate"]');
+        $btn.prop('disabled', true).find('.pod-tool-btn__label').text('Generating...');
+
+        // Stub: call our REST endpoint that will later hook into an AI provider.
+        $.ajax({
+            url: PODCustomizer.ajaxUrl,
+            method: 'POST',
+            data: {
+                action: 'pod_ai_generate',
+                nonce: PODCustomizer.nonce,
+                prompt: prompt.trim(),
+                product_id: productId,
+                print_area: printArea,
+            },
+        }).done(function (r) {
+            if (r.success && r.data.elements) {
+                // Merge AI elements onto the canvas.
+                if (!confirm('AI generated a design! Apply it to your canvas?')) return;
+                r.data.elements.forEach(function (el) {
+                    canvas.add(fabricElementFromData(el));
+                });
+                canvas.renderAll();
+                updateLayersPanel();
+                saveHistory();
+            } else {
+                alert(r.data.message || 'AI generation is not yet configured. Check back soon!');
+            }
+        }).fail(function () {
+            alert('AI generation is not yet configured. Check back soon!');
+        }).always(function () {
+            $btn.prop('disabled', false).find('.pod-tool-btn__label').text(PODCustomizer.i18n.templates || 'Templates');
+        });
+    }
+
+    /**
+     * Create a Fabric.js object from element data (used by AI stub).
+     */
+    function fabricElementFromData(el) {
+        if (el.type === 'text') {
+            return new fabric.IText(el.text || 'AI Text', {
+                left: el.x || 100,
+                top:  el.y || 100,
+                fontFamily: el.font || PODCustomizer.availableFonts[0] || 'Arial',
+                fontSize:   el.fontSize || 32,
+                fill:       el.color || '#000000',
+            });
+        }
+        if (el.type === 'image' && el.src) {
+            return new fabric.Image.fromURL(el.src, function (img) {
+                img.set({ left: el.x || 0, top: el.y || 0 });
+            });
+        }
+        if (el.type === 'shape') {
+            const common = {
+                left: el.x || 0, top: el.y || 0,
+                fill: el.fill === 'transparent' ? 'transparent' : (el.fill || '#cccccc'),
+                stroke: el.stroke || '#000000',
+                strokeWidth: el.strokeWidth || 0,
+            };
+            if (el.shape === 'circle') {
+                return new fabric.Ellipse(Object.assign({}, common, { rx: (el.width || 100) / 2, ry: (el.height || 100) / 2 }));
+            }
+            return new fabric.Rect(Object.assign({}, common, { width: el.width || 100, height: el.height || 80 }));
+        }
+        return new fabric.Rect({ left: 100, top: 100, width: 100, height: 80, fill: '#cccccc' });
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    function escAttr(str) {
+        return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     // -------------------------------------------------------------------------

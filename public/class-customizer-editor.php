@@ -92,8 +92,10 @@ class POD_Customizer_Editor
             'nonce'          => wp_create_nonce('pod_customizer_editor'),
             'restBase'       => rest_url('pod-aggregator/v1/designs'),
             'restNonce'      => wp_create_nonce('wp_rest'),
+            'presetsRestBase' => rest_url('pod-aggregator/v1/presets'),
             'availableFonts' => self::$available_fonts,
             'shapeTypes'     => self::$shape_types,
+            'productId'      => 0, // Set dynamically per-instance below.
             'i18n'           => [
                 'addText'    => __('Add Text', 'pod-aggregator'),
                 'addImage'   => __('Add Image', 'pod-aggregator'),
@@ -130,6 +132,12 @@ class POD_Customizer_Editor
                 'saved'      => __('Saved!', 'pod-aggregator'),
                 'noElements' => __('No elements yet. Add text, image, or shape.', 'pod-aggregator'),
                 'confirmClear' => __('Clear all elements? This cannot be undone.', 'pod-aggregator'),
+                'templates'  => __('Starter Templates', 'pod-aggregator'),
+                'applyTemplate' => __('Apply Template', 'pod-aggregator'),
+                'addToCart'  => __('Add to Cart', 'pod-aggregator'),
+                'savingCart' => __('Adding to cart...', 'pod-aggregator'),
+                'addedCart'  => __('Added!', 'pod-aggregator'),
+                'cartError'  => __('Error. Please try again.', 'pod-aggregator'),
             ],
         ]);
     }
@@ -217,6 +225,14 @@ class POD_Customizer_Editor
                     <button type="button" class="pod-tool-btn pod-tool-btn--primary" data-action="save">
                         <span class="dashicons dashicons-save"></span>
                         <span class="pod-tool-btn__label"><?php esc_html_e('Save', 'pod-aggregator'); ?></span>
+                    </button>
+                    <button type="button" class="pod-tool-btn" data-action="templates" title="<?php esc_attr_e('Starter Templates', 'pod-aggregator'); ?>">
+                        <span class="dashicons dashicons-portfolio"></span>
+                        <span class="pod-tool-btn__label"><?php esc_html_e('Templates', 'pod-aggregator'); ?></span>
+                    </button>
+                    <button type="button" class="pod-tool-btn" data-action="ai-generate" title="<?php esc_attr_e('AI Generate Design', 'pod-aggregator'); ?>">
+                        <span class="dashicons dashicons-superhero"></span>
+                        <span class="pod-tool-btn__label"><?php esc_html_e('AI', 'pod-aggregator'); ?></span>
                     </button>
                 </div>
             </div>
@@ -396,6 +412,43 @@ class POD_Customizer_Editor
 
             <?php // Hidden file input for image upload ?>
             <input type="file" id="pod-image-upload" accept="image/*" style="display:none;">
+
+            <?php // Template gallery modal ?>
+            <div id="pod-templates-modal" class="pod-templates-modal" style="display:none;">
+                <div class="pod-templates-modal__backdrop"></div>
+                <div class="pod-templates-modal__dialog">
+                    <div class="pod-templates-modal__header">
+                        <h2><?php esc_html_e('Starter Templates', 'pod-aggregator'); ?></h2>
+                        <button type="button" class="pod-templates-modal__close" id="pod-templates-modal-close">&times;</button>
+                    </div>
+                    <div class="pod-templates-modal__tabs" id="pod-templates-tabs">
+                        <button type="button" class="pod-templates-modal__tab active" data-category=""><?php esc_html_e('All', 'pod-aggregator'); ?></button>
+                        <?php foreach (\POD_Aggregator\Admin\Preset_Templates::DEFAULT_CATEGORIES as $key => $label): ?>
+                            <button type="button" class="pod-templates-modal__tab" data-category="<?php echo esc_attr($key); ?>"><?php echo esc_html($label); ?></button>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="pod-templates-modal__body" id="pod-templates-body">
+                        <div class="pod-templates-modal__grid" id="pod-templates-grid">
+                            <div class="pod-templates-modal__loading"><?php esc_html_e('Loading templates...', 'pod-aggregator'); ?></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <?php // Add to Cart bar ?>
+            <div class="pod-add-to-cart-bar" id="pod-add-to-cart-bar" style="display:none;">
+                <span class="pod-add-to-cart-bar__label"><?php esc_html_e('Design:', 'pod-aggregator'); ?></span>
+                <span class="pod-add-to-cart-bar__design-name" id="pod-cart-design-name"><?php esc_html_e('Unsaved design', 'pod-aggregator'); ?></span>
+                <div class="pod-add-to-cart-bar__actions">
+                    <button type="button" class="button" id="pod-btn-save-and-cart">
+                        <span class="dashicons dashicons-cart"></span>
+                        <?php esc_html_e('Save & Add to Cart', 'pod-aggregator'); ?>
+                    </button>
+                    <a href="#" class="button" id="pod-btn-view-cart" style="display:none;">
+                        <?php esc_html_e('View Cart', 'pod-aggregator'); ?>
+                    </a>
+                </div>
+            </div>
         </div>
         <?php
 

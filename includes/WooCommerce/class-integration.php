@@ -16,10 +16,19 @@ namespace POD_Aggregator\WooCommerce;
 class Integration
 {
     /** Meta key for POD product association. */
-    public const META_POD_ENABLED = '_pod_enabled';
-    public const META_PROVIDER   = '_pod_provider';
-    public const META_VARIANT_ID = '_pod_variant_id';
-    public const META_DESIGN_DATA = '_pod_design_data';
+    public const META_POD_ENABLED      = '_pod_enabled';
+    public const META_PROVIDER          = '_pod_provider';
+    public const META_VARIANT_ID        = '_pod_variant_id';
+    public const META_DESIGN_DATA       = '_pod_design_data';
+    public const META_DESIGN_UUID       = '_pod_design_uuid';
+    public const META_DESIGN_THUMB      = '_pod_design_thumb';
+    public const META_DESIGN_NAME       = '_pod_design_name';
+    public const META_PRINT_FILE_URL    = '_pod_print_file_url';
+    public const META_PRINT_AREA        = '_pod_print_area';
+    // Per-product print dimension overrides (P3-D).
+    public const META_PRINT_WIDTH_MM    = '_pod_print_width_mm';
+    public const META_PRINT_HEIGHT_MM   = '_pod_print_height_mm';
+    public const META_PRINT_DPI         = '_pod_print_dpi';
 
     /**
      * Add a "POD Product" tab to the WooCommerce product data box.
@@ -121,15 +130,66 @@ class Integration
                 </p>
             </div>
 
+            <?php // Print dimension overrides (P3-D) — shown only for POD-enabled products ?>
+            <div class="options_group" id="pod_print_dims" style="<?php echo $is_pod ? '' : 'display:none'; ?>">
+                <p class="form-field">
+                    <label for="_pod_print_width_mm"><?php esc_html_e('Print Width (mm)', 'pod-aggregator'); ?></label>
+                    <input
+                        type="number"
+                        id="_pod_print_width_mm"
+                        name="_pod_print_width_mm"
+                        class="short"
+                        value="<?php echo esc_attr($product->get_meta(self::META_PRINT_WIDTH_MM) ?: ''); ?>"
+                        placeholder="e.g. 300"
+                        min="1"
+                        step="0.1"
+                    />
+                    <span class="description"><?php esc_html_e('Override the default print width in millimetres. Leave blank to use provider default.', 'pod-aggregator'); ?></span>
+                </p>
+
+                <p class="form-field">
+                    <label for="_pod_print_height_mm"><?php esc_html_e('Print Height (mm)', 'pod-aggregator'); ?></label>
+                    <input
+                        type="number"
+                        id="_pod_print_height_mm"
+                        name="_pod_print_height_mm"
+                        class="short"
+                        value="<?php echo esc_attr($product->get_meta(self::META_PRINT_HEIGHT_MM) ?: ''); ?>"
+                        placeholder="e.g. 400"
+                        min="1"
+                        step="0.1"
+                    />
+                    <span class="description"><?php esc_html_e('Override the default print height in millimetres. Leave blank to use provider default.', 'pod-aggregator'); ?></span>
+                </p>
+
+                <p class="form-field">
+                    <label for="_pod_print_dpi"><?php esc_html_e('Print DPI', 'pod-aggregator'); ?></label>
+                    <input
+                        type="number"
+                        id="_pod_print_dpi"
+                        name="_pod_print_dpi"
+                        class="short"
+                        value="<?php echo esc_attr($product->get_meta(self::META_PRINT_DPI) ?: '300'); ?>"
+                        placeholder="300"
+                        min="72"
+                        max="600"
+                    />
+                    <span class="description"><?php esc_html_e('DPI for print file generation. Default: 300.', 'pod-aggregator'); ?></span>
+                </p>
+            </div>
+
         </div>
 
         <script>
         (function () {
-            var checkbox = document.getElementById('_pod_enabled');
-            var fields   = document.getElementById('pod_provider_fields');
-            if (checkbox && fields) {
+            var checkbox   = document.getElementById('_pod_enabled');
+            var providerFields = document.getElementById('pod_provider_fields');
+            var printDims  = document.getElementById('pod_print_dims');
+            if (checkbox) {
                 checkbox.addEventListener('change', function () {
-                    fields.style.display = this.checked ? '' : 'none';
+                    var show = this.checked;
+                    if (providerFields) providerFields.style.display = show ? '' : 'none';
+                    if (printDims)     printDims.style.display     = show ? '' : 'none';
                 });
             }
         })();
@@ -175,6 +235,18 @@ class Integration
             self::META_DESIGN_DATA,
             sanitize_text_field(wp_unslash($_POST['_pod_design_data'] ?? ''))
         );
+
+        // Print dimension overrides (P3-D).
+        if (isset($_POST['_pod_print_width_mm'])) {
+            $product->update_meta_data(self::META_PRINT_WIDTH_MM, (float) $_POST['_pod_print_width_mm']);
+        }
+        if (isset($_POST['_pod_print_height_mm'])) {
+            $product->update_meta_data(self::META_PRINT_HEIGHT_MM, (float) $_POST['_pod_print_height_mm']);
+        }
+        if (isset($_POST['_pod_print_dpi'])) {
+            $product->update_meta_data(self::META_PRINT_DPI, absint($_POST['_pod_print_dpi']));
+        }
+
         $product->save();
     }
 
@@ -212,25 +284,43 @@ class Integration
      */
     public function display_cart_item_data(array $data, array $item): array
     {
-        if (empty($item['pod']['design_data'])) {
+        if (empty($item['pod'])) {
             return $data;
         }
 
-        $design = json_decode($item['pod']['design_data'], true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            return $data;
+        $pod = $item['pod'];
+
+        // Show design name if available.
+        if (!empty($pod['design_name'])) {
+            $data[] = [
+                'key'   => __('Customization', 'pod-aggregator'),
+                'value' => esc_html($pod['design_name']),
+            ];
+        } elseif (!empty($pod['design_data'])) {
+            $design = json_decode($pod['design_data'], true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $data[] = [
+                    'key'   => __('Customization', 'pod-aggregator'),
+                    'value' => esc_html($design['description'] ?? __('Custom design applied', 'pod-aggregator')),
+                ];
+            }
         }
 
-        $data[] = [
-            'key'   => __('Customization', 'pod-aggregator'),
-            'value' => esc_html($design['description'] ?? __('Custom design applied', 'pod-aggregator')),
-        ];
+        // Show thumbnail preview if available (P3-B).
+        if (!empty($pod['design_thumb'])) {
+            $data[] = [
+                'key'   => __('Design Preview', 'pod-aggregator'),
+                'value' => '<img src="' . esc_url($pod['design_thumb']) . '" alt="Design preview" style="max-width:80px;max-height:80px;">',
+                'display' => 'virtual', // Tells WC not to escape HTML.
+            ];
+        }
 
         return $data;
     }
 
     /**
-     * Add POD design data as order line item meta.
+     * Add POD design data as order line item meta and generate the
+     * 300 DPI print file for the production POD provider (P3-C).
      *
      * @param \WC_Order_Item_Product $item         Order line item product.
      * @param string                 $cart_item_key Cart item key.
@@ -246,9 +336,63 @@ class Integration
             return;
         }
 
-        $item->add_meta_data('_pod_provider', $values['pod']['provider'] ?? '', true);
-        $item->add_meta_data('_pod_variant_id', $values['pod']['variant_id'] ?? '', true);
-        $item->add_meta_data('_pod_design_data', $values['pod']['design_data'] ?? '', true);
+        $pod = $values['pod'];
+
+        $item->add_meta_data('_pod_provider', $pod['provider'] ?? '', true);
+        $item->add_meta_data('_pod_variant_id', $pod['variant_id'] ?? '', true);
+        $item->add_meta_data('_pod_design_data', $pod['design_data'] ?? '', true);
+        $item->add_meta_data('_pod_design_uuid', $pod['design_uuid'] ?? '', true);
+        $item->add_meta_data('_pod_design_thumb', $pod['design_thumb'] ?? '', true);
+        $item->add_meta_data('_pod_design_name', $pod['design_name'] ?? '', true);
+        $item->add_meta_data('_pod_print_area', $pod['print_area'] ?? '', true);
+
+        // Generate and store the 300 DPI print file (P3-C).
+        $print_file_url = $this->generate_print_file_for_order_item($pod);
+        $item->add_meta_data('_pod_print_file_url', $print_file_url, true);
+    }
+
+    /**
+     * Generate a 300 DPI print file from a saved design and return the URL.
+     * Hooked into order item creation so the file is ready when the order
+     * is forwarded to the POD provider.
+     *
+     * P3-C: bridges Design_Storage → Print_Generator → WC order meta.
+     *
+     * @param array $pod Cart item POD data.
+     * @return string URL of the generated print file (empty on failure).
+     */
+    private function generate_print_file_for_order_item(array $pod): string
+    {
+        $design_uuid = $pod['design_uuid'] ?? '';
+        if (empty($design_uuid)) {
+            // Fall back to inline design_data if no UUID.
+            $design_data = json_decode($pod['design_data'] ?? '{}', true);
+            if (empty($design_data)) {
+                return '';
+            }
+            try {
+                $design = new \POD_Aggregator\ProductCustomizer\Design($design_data);
+            } catch (\Throwable $e) {
+                return '';
+            }
+        } else {
+            $storage = new \POD_Aggregator\ProductCustomizer\Design_Storage();
+            $design  = $storage->get($design_uuid);
+            if (!$design) {
+                return '';
+            }
+        }
+
+        $print_gen = new \POD_Aggregator\ProductCustomizer\Print_Generator();
+        $result    = $print_gen->generate($design);
+
+        if (is_wp_error($result)) {
+            // Log but don't fail the order — print file can be regenerated manually.
+            error_log('[POD Aggregator] Print file generation failed: ' . $result->get_error_message());
+            return '';
+        }
+
+        return $result['file_url'] ?? '';
     }
 
     /**
@@ -285,6 +429,9 @@ class Integration
                 'provider'             => $item->get_meta('_pod_provider', true),
                 'qty'                  => $item->get_quantity(),
                 'design_data'          => json_decode($item->get_meta('_pod_design_data', true), true),
+                'design_uuid'          => $item->get_meta('_pod_design_uuid', true),
+                'print_file_url'       => $item->get_meta('_pod_print_file_url', true),
+                'print_area'           => $item->get_meta('_pod_print_area', true),
                 'item_id'              => $item_id,
             ];
         }

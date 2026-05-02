@@ -1,0 +1,143 @@
+/**
+ * POD Aggregator — Preset Templates Admin Styles
+ */
+
+.pod-preset-templates-wrap .page-title-action {
+    margin-left: 8px;
+}
+
+.pod-preset-category-title {
+    margin-top: 32px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #c3c4c7;
+}
+
+.pod-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.pod-preset-card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.pod-preset-card__thumb {
+    width: 100%;
+    height: 160px;
+    background: #f0f0f1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.pod-preset-card__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.pod-preset-card__placeholder {
+    color: #c3c4c7;
+    font-size: 48px;
+}
+
+.pod-preset-card__info {
+    padding: 12px;
+    font-size: 13px;
+    min-height: 56px;
+}
+
+.pod-preset-card__actions {
+    padding: 8px 12px;
+    border-top: 1px solid #f0f0f1;
+    background: #fafafa;
+    text-align: right;
+}
+
+/* Modal */
+.pod-preset-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+}
+
+.pod-preset-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+}
+
+.pod-preset-modal__dialog {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    max-width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 4px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+}
+
+.pod-preset-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #c3c4c7;
+    background: #f0f0f1;
+}
+
+.pod-preset-modal__header h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.pod-preset-modal__close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #646970;
+    line-height: 1;
+}
+
+.pod-preset-modal__body {
+    padding: 20px;
+}
+
+.pod-preset-modal__body label {
+    font-weight: 600;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.pod-preset-modal__body p {
+    margin-bottom: 16px;
+}
+
+.pod-preset-modal__footer {
+    padding: 16px 20px;
+    border-top: 1px solid #c3c4c7;
+    background: #fafafa;
+}
+
+#pod-preset-json {
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.pod-presets-empty {
+    padding: 40px;
+    text-align: center;
+    color: #646970;
+}
