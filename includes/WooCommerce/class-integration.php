@@ -400,16 +400,19 @@ class Integration
      *
      * Fired on 'woocommerce_checkout_order_processed'.
      *
+     * Supports multi-provider orders: items are grouped by provider and
+     * submitted as separate orders. Each provider's result is logged to
+     * the sync log table.
+     *
      * @param int      $order_id        WooCommerce order ID.
-     * @param \WP_User $posted_data     Posted checkout data.
+     * @param mixed    $posted_data     Posted checkout data.
      * @param \WC_Order $order          Order object.
      * @return void
      */
     public function forward_order_to_provider(int $order_id, $posted_data, \WC_Order $order)
     {
-        // Only forward orders that contain POD items.
-        $has_pod_item = false;
-        $pod_items    = [];
+        // Collect POD items grouped by provider.
+        $items_by_provider = [];
 
         foreach ($order->get_items() as $item_id => $item) {
             if (!$item instanceof \WC_Order_Item_Product) {
@@ -421,79 +424,93 @@ class Integration
                 continue;
             }
 
-            $has_pod_item         = true;
-            $product              = $item->get_product();
-            $pod_items[] = [
+            // Group item under its provider.
+            if (!isset($items_by_provider[$meta_provider])) {
+                $items_by_provider[$meta_provider] = [];
+            }
+
+            $items_by_provider[$meta_provider][] = [
                 'provider_product_id' => $item->get_meta('_pod_variant_id', true),
-                'variant_id'           => $item->get_meta('_pod_variant_id', true),
-                'provider'             => $item->get_meta('_pod_provider', true),
-                'qty'                  => $item->get_quantity(),
-                'design_data'          => json_decode($item->get_meta('_pod_design_data', true), true),
-                'design_uuid'          => $item->get_meta('_pod_design_uuid', true),
-                'print_file_url'       => $item->get_meta('_pod_print_file_url', true),
-                'print_area'           => $item->get_meta('_pod_print_area', true),
-                'item_id'              => $item_id,
+                'variant_id'          => $item->get_meta('_pod_variant_id', true),
+                'provider'            => $meta_provider,
+                'qty'                 => $item->get_quantity(),
+                'design_data'         => json_decode($item->get_meta('_pod_design_data', true), true),
+                'design_uuid'         => $item->get_meta('_pod_design_uuid', true),
+                'print_file_url'      => $item->get_meta('_pod_print_file_url', true),
+                'print_area'          => $item->get_meta('_pod_print_area', true),
+                'item_id'             => $item_id,
             ];
         }
 
-        if (!$has_pod_item) {
+        if (empty($items_by_provider)) {
             return;
         }
 
-        // Get the correct provider adapter from the first cart item.
-        $provider_slug = !empty($pod_items[0]['provider']) ? $pod_items[0]['provider'] : 'printful';
-        $provider      = pod_aggregator_get_provider($provider_slug);
-
-        if (!$provider || !$provider->is_configured()) {
-            $order->add_order_note(
-                __('POD Aggregator: Provider not configured. Order not submitted.', 'pod-aggregator')
-            );
-            return;
-        }
-
-        // Build shipping address.
+        // Build shipping address once (shared across all provider orders).
         $address = $order->get_address('shipping');
-
-        $order_data = [
-            'woo_order_id'     => $order_id,
-            'items'            => $pod_items,
-            'shipping_address' => [
-                'name'     => $address['first_name'] . ' ' . $address['last_name'],
-                'address1' => $address['address_1'],
-                'address2' => $address['address_2'],
-                'city'    => $address['city'],
-                'state'   => $address['state'],
-                'country' => $address['country'],
-                'zip'     => $address['postcode'],
-                'phone'   => $order->get_billing_phone(),
-                'email'   => $order->get_billing_email(),
-            ],
+        $base_address = [
+            'name'     => $address['first_name'] . ' ' . $address['last_name'],
+            'address1' => $address['address_1'],
+            'address2' => $address['address_2'],
+            'city'    => $address['city'],
+            'state'   => $address['state'],
+            'country' => $address['country'],
+            'zip'     => $address['postcode'],
+            'phone'   => $order->get_billing_phone(),
+            'email'   => $order->get_billing_email(),
         ];
 
-        $result = $provider->submit_order($order_data);
+        // Submit a separate order to each provider.
+        $first_external_id = null;
+        foreach ($items_by_provider as $provider_slug => $pod_items) {
+            $provider = pod_aggregator_get_provider($provider_slug);
 
-        if (is_wp_error($result)) {
-            $order->add_order_note(
-                sprintf(
-                    __('POD Aggregator: Order submission failed — %s', 'pod-aggregator'),
+            if (!$provider || !$provider->is_configured()) {
+                $order->add_order_note(sprintf(
+                    __('POD Aggregator: Provider "%s" is not configured. Items not submitted.', 'pod-aggregator'),
+                    $provider_slug
+                ));
+                continue;
+            }
+
+            $order_data = [
+                'woo_order_id'     => $order_id,
+                'items'            => $pod_items,
+                'shipping_address' => $base_address,
+            ];
+
+            $result = $provider->submit_order($order_data);
+
+            if (is_wp_error($result)) {
+                $order->add_order_note(sprintf(
+                    __('POD Aggregator: %s submission failed — %s', 'pod-aggregator'),
+                    $provider->get_name(),
                     $result->get_error_message()
-                )
-            );
-            return;
-        }
+                ));
+                continue;
+            }
 
-        $external_id = $result['id'] ?? 'unknown';
-        $order->update_meta_data('_pod_external_order_id', $external_id);
-        $order->update_meta_data('_pod_provider', $provider_slug);
-        $order->save();
+            $external_id = $result['id'] ?? 'unknown';
 
-        $order->add_order_note(
-            sprintf(
+            // Store the first external ID in the WC order meta for reference.
+            if (null === $first_external_id) {
+                $first_external_id = $external_id;
+                $order->update_meta_data('_pod_external_order_id', $external_id);
+            }
+
+            // Track each provider's external ID separately.
+            $order->update_meta_data("_pod_external_order_id_{$provider_slug}", $external_id);
+            $order->add_order_note(sprintf(
                 __('POD Aggregator: Order forwarded to %s (External ID: %s)', 'pod-aggregator'),
                 $provider->get_name(),
                 $external_id
-            )
-        );
+            ));
+        }
+
+        // Store primary provider in meta.
+        $primary_provider = array_key_first($items_by_provider);
+        $order->update_meta_data('_pod_provider', $primary_provider);
+        $order->save();
     }
 
     /**
