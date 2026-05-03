@@ -79,6 +79,12 @@ function pod_aggregator_get_provider(string $slug): ?Provider_Interface
         case 'printful':
             $adapters[$slug] = new \POD_Aggregator\Provider\Printful_Adapter();
             break;
+        case 'printify':
+            $adapters[$slug] = new \POD_Aggregator\Provider\Printify_Adapter();
+            break;
+        case 'gelato':
+            $adapters[$slug] = new \POD_Aggregator\Provider\Gelato_Adapter();
+            break;
         default:
             return null;
     }
