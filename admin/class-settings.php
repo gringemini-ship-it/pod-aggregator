@@ -89,6 +89,62 @@ class Settings
             'pod_aggregator_settings',
             'pod_aggregator_sync_section'
         );
+
+        // ---- Section: Printify API ----
+        add_settings_section(
+            'pod_aggregator_printify_section',
+            __('Printify Configuration', 'pod-aggregator'),
+            [$this, 'render_printify_section_desc'],
+            'pod_aggregator_settings'
+        );
+
+        add_settings_field(
+            'printify_api_key',
+            __('Printify API Token', 'pod-aggregator'),
+            [$this, 'render_printify_api_key_field'],
+            'pod_aggregator_settings',
+            'pod_aggregator_printify_section'
+        );
+
+        add_settings_field(
+            'printify_shop_id',
+            __('Printify Shop ID', 'pod-aggregator'),
+            [$this, 'render_printify_shop_id_field'],
+            'pod_aggregator_settings',
+            'pod_aggregator_printify_section'
+        );
+
+        add_settings_field(
+            'printify_default_markup',
+            __('Default Markup (%)', 'pod-aggregator'),
+            [$this, 'render_printify_markup_field'],
+            'pod_aggregator_settings',
+            'pod_aggregator_printify_section'
+        );
+
+        // ---- Section: Gelato API ----
+        add_settings_section(
+            'pod_aggregator_gelato_section',
+            __('Gelato Configuration', 'pod-aggregator'),
+            [$this, 'render_gelato_section_desc'],
+            'pod_aggregator_settings'
+        );
+
+        add_settings_field(
+            'gelato_api_key',
+            __('Gelato API Token', 'pod-aggregator'),
+            [$this, 'render_gelato_api_key_field'],
+            'pod_aggregator_settings',
+            'pod_aggregator_gelato_section'
+        );
+
+        add_settings_field(
+            'gelato_default_markup',
+            __('Default Markup (%)', 'pod-aggregator'),
+            [$this, 'render_gelato_markup_field'],
+            'pod_aggregator_settings',
+            'pod_aggregator_gelato_section'
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -106,6 +162,142 @@ class Settings
                 '<a href="https://www.printful.com/docs/api" target="_blank" rel="noopener">printful.com/docs/api</a>'
             );
             ?>
+        </p>
+        <?php
+    }
+
+    public function render_printify_section_desc()
+    {
+        ?>
+        <p id="pod_printify_desc">
+            <?php
+            printf(
+                /* translators: %s = Printify developer docs URL */
+                esc_html__('Enter your Printify API token and Shop ID to connect. Find your credentials at %s.', 'pod-aggregator'),
+                '<a href="https://developers.printify.com/" target="_blank" rel="noopener">developers.printify.com</a>'
+            );
+            ?>
+        </p>
+        <p class="description">
+            <?php esc_html_e('You can find your Shop ID in your Printify dashboard under "My Profile" → "Shops".', 'pod-aggregator'); ?>
+        </p>
+        <?php
+    }
+
+    public function render_printify_api_key_field()
+    {
+        $settings = get_site_option(self::SETTINGS_KEY, []);
+        $value    = isset($settings['printify_api_key']) ? esc_attr($settings['printify_api_key']) : '';
+        ?>
+        <input
+            type="password"
+            id="printify_api_key"
+            name="<?php echo esc_attr(self::SETTINGS_KEY); ?>[printify_api_key]"
+            value="<?php echo $value; ?>"
+            class="regular-text"
+            autocomplete="off"
+            spellcheck="false"
+        />
+        <p class="description">
+            <?php esc_html_e('Your Printify API token. Keep this secret.', 'pod-aggregator'); ?>
+        </p>
+        <?php
+    }
+
+    public function render_printify_shop_id_field()
+    {
+        $settings = get_site_option(self::SETTINGS_KEY, []);
+        $value    = isset($settings['printify_shop_id']) ? esc_attr($settings['printify_shop_id']) : '';
+        ?>
+        <input
+            type="text"
+            id="printify_shop_id"
+            name="<?php echo esc_attr(self::SETTINGS_KEY); ?>[printify_shop_id]"
+            value="<?php echo $value; ?>"
+            class="regular-text"
+            autocomplete="off"
+        />
+        <p class="description">
+            <?php esc_html_e('Your Printify Shop ID (numeric).', 'pod-aggregator'); ?>
+        </p>
+        <?php
+    }
+
+    public function render_printify_markup_field()
+    {
+        $settings = get_site_option(self::SETTINGS_KEY, []);
+        $value    = isset($settings['printify_default_markup']) ? (int) $settings['printify_default_markup'] : 30;
+        ?>
+        <input
+            type="number"
+            id="printify_default_markup"
+            name="<?php echo esc_attr(self::SETTINGS_KEY); ?>[printify_default_markup]"
+            value="<?php echo $value; ?>"
+            class="small-text"
+            min="0"
+            max="500"
+            step="1"
+        />
+        <span><?php esc_html_e('%', 'pod-aggregator'); ?></span>
+        <p class="description">
+            <?php esc_html_e('Percentage added to the provider cost. Default: 30%.', 'pod-aggregator'); ?>
+        </p>
+        <?php
+    }
+
+    public function render_gelato_section_desc()
+    {
+        ?>
+        <p id="pod_gelato_desc">
+            <?php
+            printf(
+                /* translators: %s = Gelato API docs URL */
+                esc_html__('Enter your Gelato API token to connect. Find your token at %s.', 'pod-aggregator'),
+                '<a href="https://www.gelato.com/developers" target="_blank" rel="noopener">gelato.com/developers</a>'
+            );
+            ?>
+        </p>
+        <?php
+    }
+
+    public function render_gelato_api_key_field()
+    {
+        $settings = get_site_option(self::SETTINGS_KEY, []);
+        $value    = isset($settings['gelato_api_key']) ? esc_attr($settings['gelato_api_key']) : '';
+        ?>
+        <input
+            type="password"
+            id="gelato_api_key"
+            name="<?php echo esc_attr(self::SETTINGS_KEY); ?>[gelato_api_key]"
+            value="<?php echo $value; ?>"
+            class="regular-text"
+            autocomplete="off"
+            spellcheck="false"
+        />
+        <p class="description">
+            <?php esc_html_e('Your Gelato API token. Keep this secret.', 'pod-aggregator'); ?>
+        </p>
+        <?php
+    }
+
+    public function render_gelato_markup_field()
+    {
+        $settings = get_site_option(self::SETTINGS_KEY, []);
+        $value    = isset($settings['gelato_default_markup']) ? (int) $settings['gelato_default_markup'] : 30;
+        ?>
+        <input
+            type="number"
+            id="gelato_default_markup"
+            name="<?php echo esc_attr(self::SETTINGS_KEY); ?>[gelato_default_markup]"
+            value="<?php echo $value; ?>"
+            class="small-text"
+            min="0"
+            max="500"
+            step="1"
+        />
+        <span><?php esc_html_e('%', 'pod-aggregator'); ?></span>
+        <p class="description">
+            <?php esc_html_e('Percentage added to the provider cost. Default: 30%.', 'pod-aggregator'); ?>
         </p>
         <?php
     }
@@ -264,8 +456,33 @@ class Settings
         }
 
         // Validate Printful API key with a quick test request.
+        // If validation fails, clear the key so it is not saved.
         if (!empty($sanitized['printful_api_key'])) {
-            $this->validate_printful_key($sanitized['printful_api_key']);
+            $valid = $this->validate_printful_key($sanitized['printful_api_key']);
+            if (!$valid) {
+                $sanitized['printful_api_key'] = '';
+            }
+        }
+
+        // Printify API token.
+        $sanitized['printify_api_key'] = sanitize_text_field(wp_unslash($input['printify_api_key'] ?? ''));
+
+        // Printify Shop ID — numeric string.
+        $sanitized['printify_shop_id'] = sanitize_text_field(wp_unslash($input['printify_shop_id'] ?? ''));
+
+        // Printify markup — integer 0–500.
+        $sanitized['printify_default_markup'] = absint($input['printify_default_markup'] ?? 30);
+        if ($sanitized['printify_default_markup'] > 500) {
+            $sanitized['printify_default_markup'] = 500;
+        }
+
+        // Gelato API token.
+        $sanitized['gelato_api_key'] = sanitize_text_field(wp_unslash($input['gelato_api_key'] ?? ''));
+
+        // Gelato markup — integer 0–500.
+        $sanitized['gelato_default_markup'] = absint($input['gelato_default_markup'] ?? 30);
+        if ($sanitized['gelato_default_markup'] > 500) {
+            $sanitized['gelato_default_markup'] = 500;
         }
 
         return $sanitized;
@@ -275,9 +492,9 @@ class Settings
      * Validate Printful API key by calling the whoAmI endpoint.
      *
      * @param string $api_key
-     * @return void
+     * @return bool True if valid; false if invalid or unreachable.
      */
-    private function validate_printful_key(string $api_key)
+    private function validate_printful_key(string $api_key): bool
     {
         $response = wp_remote_get(
             'https://api.printful.com/store',
@@ -297,7 +514,7 @@ class Settings
                 __('Printful API key could not be reached. Check your server connectivity.', 'pod-aggregator'),
                 'error'
             );
-            return;
+            return false;
         }
 
         $code = wp_remote_retrieve_response_code($response);
@@ -312,6 +529,9 @@ class Settings
                 ),
                 'error'
             );
+            return false;
         }
+
+        return true;
     }
 }
