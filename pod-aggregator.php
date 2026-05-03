@@ -51,6 +51,7 @@ function pod_aggregator_load()
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/providers/class-printful.php';
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/providers/class-printify.php';
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/providers/class-gelato.php';
+    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/CLI/class-cli.php';
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/WooCommerce/class-integration.php';
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-design-element.php';
     require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-design.php';

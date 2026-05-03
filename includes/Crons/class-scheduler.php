@@ -151,7 +151,7 @@ class Scheduler
      * @param array  $product_data Normalized product data.
      * @return int Post ID.
      */
-    private function upsert_pod_product(string $provider_slug, array $product_data): int
+    public function upsert_pod_product(string $provider_slug, array $product_data): int
     {
         // Check if we already have this product.
         $existing = $this->find_pod_product($provider_slug, $product_data['provider_product_id']);
