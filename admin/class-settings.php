@@ -122,6 +122,14 @@ class Settings
             'pod_aggregator_printify_section'
         );
 
+        add_settings_field(
+            'printify_webhook_secret',
+            __('Webhook Secret', 'pod-aggregator'),
+            [$this, 'render_printify_webhook_secret_field'],
+            'pod_aggregator_settings',
+            'pod_aggregator_printify_section'
+        );
+
         // ---- Section: Gelato API ----
         add_settings_section(
             'pod_aggregator_gelato_section',
@@ -241,6 +249,26 @@ class Settings
         <span><?php esc_html_e('%', 'pod-aggregator'); ?></span>
         <p class="description">
             <?php esc_html_e('Percentage added to the provider cost. Default: 30%.', 'pod-aggregator'); ?>
+        </p>
+        <?php
+    }
+
+    public function render_printify_webhook_secret_field()
+    {
+        $settings = get_site_option(self::SETTINGS_KEY, []);
+        $value    = isset($settings['printify_webhook_secret']) ? esc_attr($settings['printify_webhook_secret']) : '';
+        ?>
+        <input
+            type="password"
+            id="printify_webhook_secret"
+            name="<?php echo esc_attr(self::SETTINGS_KEY); ?>[printify_webhook_secret]"
+            value="<?php echo $value; ?>"
+            class="regular-text"
+            autocomplete="off"
+            spellcheck="false"
+        />
+        <p class="description">
+            <?php esc_html_e('Optional. Used to verify incoming Printify webhook signatures.', 'pod-aggregator'); ?>
         </p>
         <?php
     }
@@ -475,6 +503,9 @@ class Settings
         if ($sanitized['printify_default_markup'] > 500) {
             $sanitized['printify_default_markup'] = 500;
         }
+
+        // Printify webhook secret — optional, any non-empty string.
+        $sanitized['printify_webhook_secret'] = sanitize_text_field(wp_unslash($input['printify_webhook_secret'] ?? ''));
 
         // Gelato API token.
         $sanitized['gelato_api_key'] = sanitize_text_field(wp_unslash($input['gelato_api_key'] ?? ''));
