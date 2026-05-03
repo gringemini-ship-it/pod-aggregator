@@ -99,6 +99,24 @@ class Loader
             }
         });
 
+        // ---- Custom cron interval ----
+        $this->add_filter('cron_schedules', function (array $schedules): array {
+            $settings = get_site_option('pod_aggregator_settings', []);
+            $interval_hours = max(1, (int) ($settings['sync_interval_hours'] ?? 6));
+            $interval_seconds = $interval_hours * HOUR_IN_SECONDS;
+
+            $schedules['pod_aggregator_sync_interval'] = [
+                'interval' => $interval_seconds,
+                'display'  => sprintf(
+                    /* translators: %d = number of hours */
+                    _n('Every hour', 'Every %d hours', $interval_hours, 'pod-aggregator'),
+                    $interval_hours
+                ),
+            ];
+
+            return $schedules;
+        });
+
         // ---- Admin ----
         if (is_admin()) {
             $admin = new \POD_Aggregator\Admin\Admin();
@@ -147,10 +165,16 @@ class Loader
 
         // ---- Cron ----
         $cron = new \POD_Aggregator\Crons\Scheduler();
-        // Product sync — runs every 6 hours.
+        // Product sync — runs on the pod_aggregator_sync_interval schedule.
         $this->add_action('pod_aggregator_sync_products', $cron, 'sync_products');
         // Order status sync — runs every 15 minutes.
         $this->add_action('pod_aggregator_sync_orders', $cron, 'sync_order_status');
+        // Re-schedule crons when sync interval setting changes.
+        $this->add_action('update_site_option_pod_aggregator_settings', function ($option, $value) {
+            // Clear old scheduled events so the next run picks up the new interval.
+            \POD_Aggregator\Crons\Scheduler::clear_crons();
+            \POD_Aggregator\Crons\Scheduler::schedule_crons();
+        }, 10, 2);
 
         // ---- Frontend shortcodes ----
         if (!is_admin()) {

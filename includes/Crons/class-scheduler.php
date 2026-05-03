@@ -33,28 +33,31 @@ class Scheduler
             return;
         }
 
-        $provider_slug = 'printful';
-        $provider      = \POD_Aggregator\pod_aggregator_get_provider($provider_slug);
-
-        if (!$provider || !$provider->is_configured()) {
-            $this->log('error', $provider_slug, 'sync_products', null, null, 'Provider not configured');
+        $all_providers = \POD_Aggregator\pod_aggregator_get_provider();
+        if (empty($all_providers)) {
             return;
         }
 
-        $products = $provider->get_products();
+        foreach ($all_providers as $provider_slug => $provider) {
+            if (!$provider || !$provider->is_configured()) {
+                continue;
+            }
 
-        if (is_wp_error($products)) {
-            $this->log('error', $provider_slug, 'sync_products', null, null, $products->get_error_message());
-            return;
+            $products = $provider->get_products();
+
+            if (is_wp_error($products)) {
+                $this->log('error', $provider_slug, 'sync_products', null, null, $products->get_error_message());
+                continue;
+            }
+
+            $count = 0;
+            foreach ($products as $product_data) {
+                $this->upsert_pod_product($provider_slug, $product_data);
+                $count++;
+            }
+
+            $this->log('success', $provider_slug, 'sync_products', null, null, "Synced {$count} products");
         }
-
-        $count = 0;
-        foreach ($products as $product_data) {
-            $this->upsert_pod_product($provider_slug, $product_data);
-            $count++;
-        }
-
-        $this->log('success', $provider_slug, 'sync_products', null, null, "Synced {$count} products");
 
         // Update last sync time.
         update_site_option('pod_aggregator_last_product_sync', current_time('mysql'));
@@ -108,21 +111,21 @@ class Scheduler
     }
 
     /**
-     * Schedule all cron events. Called on activation.
+     * Schedule all cron events. Called on activation and when settings change.
+     * Uses the 'pod_aggregator_sync_interval' schedule registered via cron_schedules.
      *
      * @return void
      */
     public static function schedule_crons()
     {
-        $settings = get_site_option('pod_aggregator_settings', []);
-        $interval = (int) ($settings['sync_interval_hours'] ?? 6);
+        $interval = 'pod_aggregator_sync_interval';
 
         if (!wp_next_scheduled(self::HOOK_PRODUCT_SYNC)) {
-            wp_schedule_event(time(), 'hourly', self::HOOK_PRODUCT_SYNC);
+            wp_schedule_event(time(), $interval, self::HOOK_PRODUCT_SYNC);
         }
 
         if (!wp_next_scheduled(self::HOOK_ORDER_SYNC)) {
-            wp_schedule_event(time(), 'hourly', self::HOOK_ORDER_SYNC);
+            wp_schedule_event(time(), $interval, self::HOOK_ORDER_SYNC);
         }
     }
 
