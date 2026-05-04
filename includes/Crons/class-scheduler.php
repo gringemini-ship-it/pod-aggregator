@@ -22,10 +22,11 @@ class Scheduler
     /**
      * Schedule product catalog sync.
      *
-     * @param bool $manual If true, run immediately and skip schedule.
+     * @param bool   $manual        If true, run immediately and skip auto-sync check.
+     * @param string $provider_slug  If provided, sync only this provider.
      * @return void
      */
-    public function sync_products(bool $manual = false)
+    public function sync_products(bool $manual = false, string $provider_slug = '')
     {
         $settings = get_site_option('pod_aggregator_settings', []);
 
@@ -38,7 +39,12 @@ class Scheduler
             return;
         }
 
-        foreach ($all_providers as $provider_slug => $provider) {
+        foreach ($all_providers as $slug => $provider) {
+            // If a specific provider was requested, skip all others.
+            if ($provider_slug !== '' && $slug !== $provider_slug) {
+                continue;
+            }
+
             if (!$provider || !$provider->is_configured()) {
                 continue;
             }
@@ -46,17 +52,17 @@ class Scheduler
             $products = $provider->get_products();
 
             if (is_wp_error($products)) {
-                $this->log('error', $provider_slug, 'sync_products', null, null, $products->get_error_message());
+                $this->log('error', $slug, 'sync_products', null, null, $products->get_error_message());
                 continue;
             }
 
             $count = 0;
             foreach ($products as $product_data) {
-                $this->upsert_pod_product($provider_slug, $product_data);
+                $this->upsert_pod_product($slug, $product_data);
                 $count++;
             }
 
-            $this->log('success', $provider_slug, 'sync_products', null, null, "Synced {$count} products");
+            $this->log('success', $slug, 'sync_products', null, null, "Synced {$count} products");
         }
 
         // Update last sync time.
