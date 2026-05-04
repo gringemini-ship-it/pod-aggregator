@@ -37,8 +37,9 @@ Authorization: Basic BASE64(username : application_password)
 WP-CLI commands bypass authentication entirely — useful for automated scripts and cron triggers:
 
 ```bash
-wp pod-aggregator sync
-wp pod-aggregator design list
+wp pod syncProducts --provider=printify
+wp pod syncOrders --provider=gelato
+wp pod testConnection --provider=printful
 ```
 
 ---
@@ -213,61 +214,29 @@ POST /print-files
 
 ---
 
-### Sync Products
+## Webhook Reference
 
-Trigger a product catalog sync from Printful. Returns immediately; sync runs in the background.
+POD Aggregator receives webhook events from Printful, Printify, and Gelato to automatically update WooCommerce order statuses. Each provider has its own webhook URL, shown in **Settings → POD Aggregator** under the respective provider tab.
 
-```
-POST /sync
-```
+### Webhook URLs
 
-**Request body (all fields optional):**
+Copy the URL for each provider from **Settings → POD Aggregator** and register it in your provider's dashboard:
 
-```json
-{
-  "product_ids": [123, 456],
-  "full_refresh": false
-}
-```
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `product_ids` | array of ints | Sync only these Printful product IDs. If omitted, sync all. |
-| `full_refresh` | boolean | If `true`, refetches full catalog from Printful. Default `false` (incremental). |
-
-**Response `202 Accepted`:**
-
-```json
-{
-  "success": true,
-  "message": "Sync started",
-  "data": {
-    "job_id": "sync_20250615_103000",
-    "products_queued": 42
-  }
-}
-```
-
-To check sync status, use the WP-CLI command:
-
-```bash
-wp pod-aggregator sync --dry-run
-```
+| Provider | Webhook URL | Auth Method |
+|----------|-------------|-------------|
+| Printful | `https://yoursite.com/wp-json/pod-aggregator/v1/webhook?provider=printful` | HMAC-SHA256 signature |
+| Printify | `https://yoursite.com/wp-json/pod-aggregator/v1/webhook?provider=printify` | HMAC-SHA256 signature |
+| Gelato | `https://yoursite.com/wp-json/pod-aggregator/v1/webhook?provider=gelato` | Bearer token |
 
 ---
 
-## Webhook Reference
+### Printful Webhooks
 
-POD Aggregator receives webhook events from Printful to automatically update WooCommerce order statuses.
-
-### Setting Up the Webhook in Printful
+#### Setting Up in Printful
 
 1. Log into Printful → **[Webhooks](https://www.printful.com/dashboard)**
 2. Click **Add Webhook**
-3. Enter your webhook URL:
-   ```
-   https://yoursite.com/wp-json/pod-aggregator/v1/webhook
-   ```
+3. Enter your Printful webhook URL (from Settings)
 4. Select the events you want to receive:
    - `order_created` — Order received by Printful
    - `order_processing` — Printful started production
@@ -275,14 +244,12 @@ POD Aggregator receives webhook events from Printful to automatically update Woo
    - `order_cancelled` — Order cancelled
    - `order_failed` — Production failed
 5. Copy the **Webhook Secret** shown by Printful
-6. In WordPress, go to **Settings → POD Aggregator → Webhook Secret** and paste it
+6. In WordPress, go to **Settings → POD Aggregator → Printful → Webhook Secret** and paste it
 7. Click **Save Changes**
 
-### Verifying the Webhook Signature
+#### Verifying the Signature
 
-Printful signs every webhook payload with HMAC-SHA256 using your webhook secret. POD Aggregator verifies this signature on every incoming webhook request.
-
-The signature is sent in the `Printful-Signature` header:
+Printful signs every webhook payload with HMAC-SHA256 using your webhook secret. The signature is in the `Printful-Signature` header:
 
 ```
 Printful-Signature: sha256=abc123def456...
@@ -306,7 +273,7 @@ Printful-Signature: sha256=abc123def456...
 
 HTTP status: `401 Unauthorized`
 
-### Webhook Events Reference
+#### Printful Webhook Events
 
 | Event | WooCommerce Action | Description |
 |-------|-------------------|-------------|
@@ -316,7 +283,7 @@ HTTP status: `401 Unauthorized`
 | `order_cancelled` | Set status `cancelled` | Printful cancelled the order |
 | `order_failed` | Set status `failed` | Production failed (e.g., image quality issue) |
 
-**Tracking information** — When `order_shipped` is received, Printful includes tracking data:
+**Tracking information** — When `order_shipped` is received:
 
 ```json
 {
@@ -329,9 +296,73 @@ HTTP status: `401 Unauthorized`
 
 This is added as a note to the WooCommerce order.
 
-### Order ID Mapping
+**Order ID mapping:** Printful webhook `order_id` is stored as `_pod_printful_order_id` on the WooCommerce order.
 
-Printful webhook `order_id` is the Printful order ID. POD Aggregator stores the Printful order ID in WooCommerce order meta as `_pod_printful_order_id`. The plugin uses this to match incoming webhooks to the correct WooCommerce order.
+---
+
+### Printify Webhooks
+
+#### Setting Up in Printify
+
+1. Log into Printify → **My Profile → Webhooks**
+2. Click **Add Webhook**
+3. Enter your Printify webhook URL (from Settings)
+4. Select events for order updates
+5. Copy the **Webhook Secret** and paste it into **Settings → POD Aggregator → Printify → Webhook Secret**
+
+#### Verifying the Signature
+
+Printify signs webhook payloads with HMAC-SHA256. The signature is in the `Printify-Signature` header:
+
+```
+Printify-Signature: sha256=abc123def456...
+```
+
+Verification follows the same pattern as Printful — timing-safe HMAC-SHA256 comparison against the stored secret. Invalid signatures return `401 Unauthorized`.
+
+#### Printify Webhook Events
+
+| Event | WooCommerce Action | Description |
+|-------|-------------------|-------------|
+| `created` | (no change) | Order received by Printify |
+| `processing` | Set status `processing` | Printify accepted and started production |
+| `shipped` | Set status `completed` | Shipped with tracking; note added to order |
+| `cancelled` | Set status `cancelled` | Printify cancelled the order |
+| `failed` | Set status `failed` | Production failed |
+
+**Order ID mapping:** Printify order ID is stored as `_pod_printify_order_id` on the WooCommerce order.
+
+---
+
+### Gelato Webhooks
+
+#### Setting Up in Gelato
+
+1. Log into Gelato → **Settings → Webhooks**
+2. Add a webhook pointing to your Gelato webhook URL (from Settings)
+3. Gelato does not require a separate webhook secret — authentication is done via the **Bearer token** in the `Authorization` header of every webhook request
+
+#### Verifying the Request
+
+Gelato sends a Bearer token in the `Authorization` header:
+
+```
+Authorization: Bearer YOUR_GELATO_API_KEY
+```
+
+The plugin verifies this token against the Gelato API key stored in **Settings → POD Aggregator → Gelato**. If the token does not match, the request is rejected with `401 Unauthorized`.
+
+#### Gelato Webhook Events
+
+| Event | WooCommerce Action | Description |
+|-------|-------------------|-------------|
+| `created` | (no change) | Order received by Gelato |
+| `processing` | Set status `processing` | Gelato accepted and started production |
+| `shipped` | Set status `completed` | Shipped with tracking; note added to order |
+| `cancelled` | Set status `cancelled` | Gelato cancelled the order |
+| `failed` | Set status `failed` | Production failed |
+
+**Order ID mapping:** Gelato order ID is stored as `_pod_gelato_order_id` on the WooCommerce order.
 
 ---
 
@@ -350,12 +381,13 @@ All endpoints return a consistent error format:
 | HTTP Status | `code` | Meaning |
 |-------------|--------|---------|
 | `400` | `INVALID_REQUEST` | Malformed JSON or missing required field |
-| `401` | `AUTH_FAILED` | Missing or invalid authentication |
+| `401` | `AUTH_FAILED` | Missing or invalid authentication / webhook signature |
 | `403` | `FORBIDDEN` | Authenticated user lacks required capability |
 | `404` | `NOT_FOUND` | Resource (design, product) does not exist |
 | `409` | `CONFLICT` | Design conflict (e.g., duplicate) |
 | `422` | `VALIDATION_ERROR` | Request is valid JSON but fails business logic validation |
+| `429` | `RATE_LIMITED` | Too many requests — back off and retry |
 | `500` | `SERVER_ERROR` | Unexpected server error |
-| `503` | `SERVICE_UNAVAILABLE` | Printful API is unreachable |
+| `503` | `SERVICE_UNAVAILABLE` | Provider API is unreachable |
 
 Rate limiting: if too many requests are made in a short period, the API returns `429 Too Many Requests`.
