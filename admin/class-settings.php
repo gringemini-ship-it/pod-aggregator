@@ -161,6 +161,8 @@ class Settings
 
     public function render_printful_section_desc()
     {
+        $controller = new \POD_Aggregator\REST\Controller();
+        $webhook_url = esc_url($controller->get_webhook_url('printful'));
         ?>
         <p id="pod_printful_desc">
             <?php
@@ -171,11 +173,18 @@ class Settings
             );
             ?>
         </p>
+        <p class="description">
+            <strong><?php esc_html_e('Webhook URL:', 'pod-aggregator'); ?></strong>
+            <code style="display:block;margin-top:4px;padding:6px;background:#f0f0f0;font-size:12px;word-break:break-all;"><?php echo $webhook_url; ?></code>
+            <?php esc_html_e('Register this URL in your Printful dashboard under "Webhooks" to receive order status updates.', 'pod-aggregator'); ?>
+        </p>
         <?php
     }
 
     public function render_printify_section_desc()
     {
+        $controller = new \POD_Aggregator\REST\Controller();
+        $webhook_url = esc_url($controller->get_webhook_url('printify'));
         ?>
         <p id="pod_printify_desc">
             <?php
@@ -188,6 +197,11 @@ class Settings
         </p>
         <p class="description">
             <?php esc_html_e('You can find your Shop ID in your Printify dashboard under "My Profile" → "Shops".', 'pod-aggregator'); ?>
+        </p>
+        <p class="description">
+            <strong><?php esc_html_e('Webhook URL:', 'pod-aggregator'); ?></strong>
+            <code style="display:block;margin-top:4px;padding:6px;background:#f0f0f0;font-size:12px;word-break:break-all;"><?php echo $webhook_url; ?></code>
+            <?php esc_html_e('Register this URL in your Printify dashboard to receive order status updates.', 'pod-aggregator'); ?>
         </p>
         <?php
     }
@@ -275,6 +289,8 @@ class Settings
 
     public function render_gelato_section_desc()
     {
+        $controller = new \POD_Aggregator\REST\Controller();
+        $webhook_url = esc_url($controller->get_webhook_url('gelato'));
         ?>
         <p id="pod_gelato_desc">
             <?php
@@ -284,6 +300,11 @@ class Settings
                 '<a href="https://www.gelato.com/developers" target="_blank" rel="noopener">gelato.com/developers</a>'
             );
             ?>
+        </p>
+        <p class="description">
+            <strong><?php esc_html_e('Webhook URL:', 'pod-aggregator'); ?></strong>
+            <code style="display:block;margin-top:4px;padding:6px;background:#f0f0f0;font-size:12px;word-break:break-all;"><?php echo $webhook_url; ?></code>
+            <?php esc_html_e('Register this URL in your Gelato dashboard to receive order status updates.', 'pod-aggregator'); ?>
         </p>
         <?php
     }
