@@ -122,6 +122,7 @@ class Loader
             $admin = new \POD_Aggregator\Admin\Admin();
             $this->add_action('admin_menu', $admin, 'add_menu_pages');
             $this->add_action('admin_init', $admin, 'register_settings');
+            $this->add_action('wp_ajax_pod_manual_sync', $admin, 'ajax_manual_sync_products');
 
             $settings = new \POD_Aggregator\Admin\Settings();
             $this->add_action('admin_init', $settings, 'register_settings');
