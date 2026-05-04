@@ -622,4 +622,23 @@ class Controller
 
         return $order_id ? (int) $order_id : null;
     }
+
+    /**
+     * Get the public webhook URL for a given provider.
+     *
+     * Use this in the settings page so the admin can copy the URL into
+     * the provider's webhook dashboard.
+     *
+     * @param string $provider Provider slug (e.g. 'printful', 'printify', 'gelato').
+     * @return string Full webhook URL, or empty string if provider is unknown.
+     */
+    public function get_webhook_url(string $provider): string
+    {
+        $known = ['printful', 'printify', 'gelato'];
+        if (!in_array($provider, $known, true)) {
+            return '';
+        }
+
+        return rest_url(self::REST_NAMESPACE . '/webhook/' . $provider);
+    }
 }

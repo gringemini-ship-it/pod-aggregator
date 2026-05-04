@@ -80,18 +80,22 @@ class Admin
      */
     public function render_dashboard_page()
     {
-        $printful_connected = false;
-        $provider = null;
-
-        try {
-            $provider = \POD_Aggregator\pod_aggregator_get_provider('printful');
-            $printful_connected = $provider && $provider->is_configured();
-        } catch (\Throwable $e) {
-            // Ignore.
+        $providers = [];
+        foreach (['printful', 'printify', 'gelato'] as $slug) {
+            $providers[$slug] = ['connected' => false, 'name' => ucfirst($slug)];
+            try {
+                $provider = \POD_Aggregator\pod_aggregator_get_provider($slug);
+                $providers[$slug]['connected'] = $provider && $provider->is_configured();
+            } catch (\Throwable $e) {
+                $providers[$slug]['connected'] = false;
+            }
         }
 
         $stats = $this->get_sync_stats();
         $schedules = $this->get_cron_schedules();
+
+        // Nonce for AJAX sync.
+        $sync_nonce = wp_create_nonce('pod_manual_sync');
 
         ?>
         <div class="wrap">
@@ -115,10 +119,11 @@ class Admin
                         </tr>
                     </thead>
                     <tbody>
+                        <?php foreach ($providers as $slug => $data): ?>
                         <tr>
-                            <td><strong>Printful</strong></td>
+                            <td><strong><?php echo esc_html($data['name']); ?></strong></td>
                             <td>
-                                <?php if ($printful_connected): ?>
+                                <?php if ($data['connected']): ?>
                                     <span style="color:green;">&#10003; <?php esc_html_e('Connected', 'pod-aggregator'); ?></span>
                                 <?php else: ?>
                                     <span style="color:red;">&#10007; <?php esc_html_e('Not configured', 'pod-aggregator'); ?></span>
@@ -130,6 +135,7 @@ class Admin
                                 </a>
                             </td>
                         </tr>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
@@ -161,12 +167,54 @@ class Admin
                     </tbody>
                 </table>
                 <p>
-                    <a href="<?php echo esc_url(wp_nonce_url(network_admin_url('admin.php?page=pod-aggregator&action=sync_products'), 'pod_sync_products')); ?>" class="button">
+                    <button type="button" id="pod-manual-sync-btn" class="button" data-nonce="<?php echo esc_attr($sync_nonce); ?>">
                         <?php esc_html_e('Sync Products Now', 'pod-aggregator'); ?>
-                    </a>
+                    </button>
+                    <span id="pod-sync-status" style="margin-left:10px;"></span>
                 </p>
             </div>
         </div>
+
+        <script>
+        (function () {
+            var btn = document.getElementById('pod-manual-sync-btn');
+            if (!btn) return;
+
+            btn.addEventListener('click', function () {
+                btn.disabled = true;
+                var status = document.getElementById('pod-sync-status');
+                status.textContent = '<?php esc_attr_e('Syncing…', 'pod-aggregator'); ?>';
+
+                var data = new FormData();
+                data.append('action', 'pod_manual_sync');
+                data.append('nonce', btn.dataset.nonce);
+
+                fetch(ajaxurl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    body: data
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (resp) {
+                    btn.disabled = false;
+                    if (resp.success) {
+                        status.textContent = resp.data.message || '<?php esc_attr_e('Sync complete.', 'pod-aggregator'); ?>';
+                        status.style.color = 'green';
+                    } else {
+                        status.textContent = resp.data.message || '<?php esc_attr_e('Sync failed.', 'pod-aggregator'); ?>';
+                        status.style.color = 'red';
+                    }
+                    // Auto-clear after 5s.
+                    setTimeout(function () { status.textContent = ''; }, 5000);
+                })
+                .catch(function () {
+                    btn.disabled = false;
+                    status.textContent = '<?php esc_attr_e('Network error.', 'pod-aggregator'); ?>';
+                    status.style.color = 'red';
+                });
+            });
+        })();
+        </script>
         <?php
     }
 
@@ -355,5 +403,61 @@ class Admin
             'products' => __('Every 6 hours', 'pod-aggregator'),
             'orders'   => __('Every 15 minutes', 'pod-aggregator'),
         ];
+    }
+
+    /**
+     * AJAX handler — manually trigger product sync.
+     *
+     * Requires manage_network capability and a valid nonce.
+     * Responds with JSON: { success: bool, message: string, synced: int }
+     *
+     * @return void
+     */
+    public function ajax_manual_sync_products(): void
+    {
+        check_ajax_referer('pod_manual_sync', 'nonce');
+
+        if (!current_user_can('manage_network')) {
+            wp_send_json_error(['message' => __('Permission denied.', 'pod-aggregator')], 403);
+            return;
+        }
+
+        $scheduler = new \POD_Aggregator\Crons\Scheduler();
+
+        // Sync each configured provider.
+        $providers = \POD_Aggregator\pod_aggregator_get_provider();
+        $synced = 0;
+        $errors = [];
+
+        foreach ($providers as $slug => $provider) {
+            if (!$provider->is_configured()) {
+                continue;
+            }
+
+            try {
+                // Call sync_products() directly with manual=true for verbose output.
+                $scheduler->sync_products(true, $slug);
+                $synced++;
+            } catch (\Throwable $e) {
+                $errors[] = sprintf('%s: %s', ucfirst($slug), $e->getMessage());
+            }
+        }
+
+        if ($errors) {
+            wp_send_json_success([
+                'message' => implode('; ', $errors),
+                'synced'  => $synced,
+            ]);
+            return;
+        }
+
+        wp_send_json_success([
+            'message' => sprintf(
+                /* translators: %d = number of providers synced */
+                _n('Product sync complete for %d provider.', 'Product sync complete for %d providers.', $synced, 'pod-aggregator'),
+                $synced
+            ),
+            'synced' => $synced,
+        ]);
     }
 }
