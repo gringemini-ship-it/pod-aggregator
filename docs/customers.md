@@ -2,7 +2,7 @@
 
 Everything end-users (store owners) need to install, configure, and use POD Aggregator.
 
-**Assumes:** WordPress 6.9+, PHP 7.4+, WooCommerce 8+, a Printful account
+**Assumes:** WordPress 6.9+, PHP 7.4+, WooCommerce 8+, at least one of Printful / Printify / Gelato.
 
 ---
 
@@ -15,8 +15,8 @@ Before installing, confirm your environment meets the requirements:
 - [ ] WordPress 6.9 or higher — check in **Dashboard → Updates**
 - [ ] WooCommerce 8.x installed and activated — **Plugins → Installed Plugins**
 - [ ] PHP 7.4+ with `gd`, `mbstring`, `curl` extensions — ask your host if unsure
-- [ ] Printful account with API key ready — get one free at [printful.com](https://www.printful.com)
-- [ ] HTTPS enabled on your site (required for Printful API and webhooks)
+- [ ] At least one POD provider account (Printful, Printify, or Gelato)
+- [ ] HTTPS enabled on your site (required for provider APIs and webhooks)
 
 To check your PHP extensions, ask your host or add this to a PHP file and open it in your browser:
 
@@ -59,68 +59,136 @@ Do NOT activate it on individual sub-sites — CPTs and REST routes will not reg
 
 After activation, you should see a new menu under **My Sites → Network Admin → Settings** (or **Settings** on single-site):
 
-- **POD Aggregator** — Provider settings (Printful API key, default markup, sync frequency)
+- **POD Aggregator** — Provider settings (Printful, Printify, Gelato API keys; default markup; sync frequency)
 
 And under the **My Sites** menu (multisite) or top-level admin menu:
 
-- **POD Products** — Browse and import Printful catalog
+- **POD Products** — Browse and import from each provider's catalog
 - **POD Designs** — Manage saved design templates
 
 ---
 
 ## Setup Guide
 
-### 1. Connect Printful
+### 1. Connect Your Providers
 
-1. Go to **Settings → POD Aggregator**
-2. Find the **Printful API Key** field
-3. Log into Printful → **[Account → API](https://www.printful.com/dashboard)**
-4. Copy your API key and paste it into the field
-5. Click **Save Changes**
+Go to **Settings → POD Aggregator**. You will see three tabs: **Printful**, **Printify**, and **Gelato**. Connect one or more providers.
 
-The plugin will immediately verify the key by making a test call to Printful. If you see a green confirmation, the connection is working.
+#### Printful
 
-> **Security note:** Your API key is stored as a WordPress site option (or network option on multisite). Consider also setting it via a constant in `wp-config.php` for enhanced security:
+1. Go to the **Printful** tab
+2. Log into Printful → **[Account → API](https://www.printful.com/dashboard)**
+3. Copy your API key and paste it into the **Printful API Key** field
+4. The plugin verifies the key automatically on save — a green indicator confirms the connection
+5. Copy the **Webhook URL** shown in the section description (you'll paste it into Printful's dashboard in Step 2)
+
+> **Security note:** Your API key is stored as a WordPress site option (or network option on multisite). You can also set it via a constant in `wp-config.php`:
 > ```php
 > define('POD_AGGREGATOR_PRINTFUL_API_KEY', 'your_key_here');
 > ```
 > The constant takes precedence over the database value.
 
-### 2. Import Products
+#### Printify
+
+1. Go to the **Printify** tab
+2. Log into Printify → **My Profile → API**
+3. Generate or copy your API token
+4. Enter your **Printify API Token** and **Shop ID** in the corresponding fields
+5. Optionally set a **Default Markup %** (default: 10%) to apply to all imported Printify products
+6. The plugin verifies the connection automatically on save
+7. Copy the **Webhook URL** shown in the section description
+
+> The Printify API token can also be set via constant:
+> ```php
+> define('POD_AGGREGATOR_PRINTIFY_API_TOKEN', 'your_token_here');
+> ```
+
+#### Gelato
+
+1. Go to the **Gelato** tab
+2. Log into Gelato → **Settings → API**
+3. Create an API key and paste it into the **Gelato API Key** field
+4. Optionally set product, address, and webhook secrets if you use Gelato's webhook signature verification
+5. The plugin verifies the connection automatically on save
+6. Copy the **Webhook URL** shown in the section description
+
+> The Gelato API key can also be set via constant:
+> ```php
+> define('POD_AGGREGATOR_GELATO_API_KEY', 'your_key_here');
+> ```
+
+### 2. Set Up Webhooks (Required for Order Status Updates)
+
+Webhooks keep WooCommerce order statuses in sync with your provider. Without webhooks, you must manually check order status.
+
+#### Printful
+
+1. Log into Printful → **[Webhooks](https://www.printful.com/dashboard)**
+2. Click **Add Webhook**
+3. Enter the webhook URL shown in **Settings → POD Aggregator → Printful**
+4. Select these events:
+   - `order_created` — Order received by Printful
+   - `order_processing` — Printful started production
+   - `order_shipped` — Shipped (with tracking number)
+   - `order_cancelled` — Order cancelled
+   - `order_failed` — Production failed
+5. Copy the **Webhook Secret** shown by Printful
+6. Back in WordPress, paste the secret into **Settings → POD Aggregator → Printful → Webhook Secret**
+7. Click **Save Changes**
+
+#### Printify
+
+1. Log into Printify → **My Profile → Webhooks**
+2. Click **Add Webhook**
+3. Enter the webhook URL shown in **Settings → POD Aggregator → Printify**
+4. Select events for order updates
+5. Copy the **Webhook Secret** and paste it into **Settings → POD Aggregator → Printify → Webhook Secret**
+
+#### Gelato
+
+1. Log into Gelato → **Settings → Webhooks**
+2. Add a webhook pointing to the URL shown in **Settings → POD Aggregator → Gelato**
+3. Gelato uses Bearer token authentication — no secret to copy; the plugin validates the Bearer token in the `Authorization` header against your configured API key
+
+---
+
+### 3. Import Products
 
 1. Go to **POD Products → Import**
-2. You will see the Printful product catalog — browse by category or search
-3. Click **Import** next to any product you want to add to your store
-4. The product is created as a WooCommerce product with:
-   - Product name and description from Printful
-   - Base cost from Printful
-   - Your configured default markup added to the price
-5. Imported products appear in **WooCommerce → Products**
+2. Select the **Provider** tab (Printful / Printify / Gelato) for the catalog you want to browse
+3. Browse by category or search for a specific product
+4. Click **Import** next to any product you want to add to your store
+5. The product is created as a WooCommerce product with:
+   - Product name and description from the provider
+   - Base cost from the provider
+   - Your configured markup added to the price
+6. Imported products appear in **WooCommerce → Products**
 
-To set a per-product markup before importing:
+To set a per-product markup before importing, adjust the **Markup %** column for each product, then click **Import Selected**.
 
-1. On the import screen, adjust the **Markup %** column for each product
-2. Then click **Import Selected**
+---
 
-### 3. Configure Pricing Markup
+### 4. Configure Pricing Markup
 
 The plugin calculates selling price as:
 
 ```
-selling_price = printful_base_cost × (1 + markup_percentage / 100)
+selling_price = provider_base_cost × (1 + markup_percentage / 100)
 ```
 
-**Global default markup** — Set in **Settings → POD Aggregator → Default Markup %**.
+**Global default markup** — Set in **Settings → POD Aggregator** (per-provider tab).
 
 **Per-product override:**
 
 1. Edit the WooCommerce product
 2. Look for the **POD Aggregator** metabox
-3. Enter a custom markup % (leave blank to use the global default)
+3. Enter a custom markup % (leave blank to use the global default for that provider)
 
 **Example:** Base cost $20.00 + 40% markup = $28.00 selling price.
 
-### 4. Enable Product Customizer
+---
+
+### 5. Enable Product Customizer
 
 The visual design editor lets customers personalise products before adding to cart.
 
@@ -134,7 +202,7 @@ The visual design editor lets customers personalise products before adding to ca
 
 The customiser appears on the product page automatically for enabled products. It replaces or augments the featured image area depending on your theme.
 
-**Print areas** are determined by the Printful product configuration. Each print area can accept:
+**Print areas** are determined by the provider's product configuration. Each print area can accept:
 - **Text** — fonts, sizes, colours, alignment
 - **Images** — uploaded photos, logos (PNG/JPG, min 300 DPI recommended)
 
@@ -237,7 +305,7 @@ SKU: POD-PTF-001
 ─────────────────────────────
 Design ID: a1b2c3d4-e5f6-7890-abcd-ef1234567890
 Print Area: Front
-Provider: Printful
+Provider: Printify
 [View Design]  [Edit Design]
 ```
 
@@ -251,9 +319,9 @@ The following data is stored as WooCommerce cart item meta:
 | Key | Description |
 |-----|-------------|
 | `_pod_design_id` | UUID of the saved design |
-| `_pod_provider` | Provider slug (`printful`) |
+| `_pod_provider` | Provider slug (`printful`, `printify`, or `gelato`) |
 | `_pod_print_area` | Print area name (`front`, `back`, etc.) |
-| `_pod_product_id` | Printful variant ID |
+| `_pod_product_id` | Provider variant ID |
 | `_pod_print_file_url` | URL of the generated 300 DPI print file |
 
 ### Checkout Flow
@@ -262,21 +330,45 @@ The following data is stored as WooCommerce cart item meta:
 2. On `woocommerce_checkout_order_processed`, the plugin:
    - Retrieves the cart item design metadata
    - Generates (or retrieves cached) 300 DPI print file
-   - Submits the order to Printful via the Printful API
-   - Stores the Printful order ID in WooCommerce order meta: `_pod_printful_order_id`
-3. A note is added to the WooCommerce order: `"Order submitted to Printful. Printful ID: [ID]"`
-4. If submission fails, a note is added: `"Warning: Order submission to Printful failed. Reason: [error]"` and the order continues processing normally
+   - Submits the order to the correct provider via their API
+   - Stores the provider order ID in WooCommerce order meta (e.g. `_pod_printify_order_id`)
+3. A note is added to the WooCommerce order: `"Order submitted to [Provider]. [Provider] ID: [ID]"`
+4. If submission fails, the plugin retries up to 3 times with exponential backoff. If all retries fail, a note is added: `"Warning: Order submission to [Provider] failed. Reason: [error]"` and the order continues processing normally
+
+**Multi-provider orders:** If a single order contains items from different providers (e.g. a Printify shirt and a Gelato mug), the plugin splits the order and submits each provider's items separately.
 
 ### Order Confirmation Page
 
-The order confirmation page shows the same design summary as the cart for each customised item, plus the Printful order ID if successfully submitted.
+The order confirmation page shows the same design summary as the cart for each customised item, plus the provider order ID if successfully submitted.
 
 ### Order Status Transitions
 
-Printful sends webhook events when order status changes. The plugin processes these and updates the WooCommerce order status:
+Providers send webhook events when order status changes. The plugin processes these and updates the WooCommerce order status:
+
+#### Printful
 
 | Printful Status | WooCommerce Status |
 |----------------|-------------------|
+| `created` | (new — no change) |
+| `processing` | `processing` |
+| `shipped` | `completed` (with tracking note) |
+| `cancelled` | `cancelled` |
+| `failed` | `failed` |
+
+#### Printify
+
+| Printify Status | WooCommerce Status |
+|----------------|-------------------|
+| `created` | (new — no change) |
+| `processing` | `processing` |
+| `shipped` | `completed` (with tracking note) |
+| `cancelled` | `cancelled` |
+| `failed` | `failed` |
+
+#### Gelato
+
+| Gelato Status | WooCommerce Status |
+|-------------|-------------------|
 | `created` | (new — no change) |
 | `processing` | `processing` |
 | `shipped` | `completed` (with tracking note) |
@@ -315,12 +407,14 @@ To reset all plugin data without uninstalling:
 
 ```bash
 # WP-CLI — delete all POD designs and synced products
-wp pod-aggregator hard-reset --confirm
+wp pod hard-reset --confirm
 
 # Or manually via WP-CLI:
 wp post delete $(wp post list --post_type=pod_design --format=ids) --force
 wp post delete $(wp post list --post_type=pod_product --format=ids) --force
 wp site option delete pod_aggregator_printful_api_key
+wp site option delete pod_aggregator_printify_api_token
+wp site option delete pod_aggregator_gelato_api_key
 wp site option delete pod_aggregator_settings
 ```
 
