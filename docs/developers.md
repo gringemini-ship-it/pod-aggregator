@@ -10,36 +10,43 @@ Everything you need to develop, test, and contribute to POD Aggregator.
 
 ```
 pod-aggregator/
-├── pod-aggregator.php          # Bootstrap + plugin header (activation hooks here)
-├── admin/                      # Admin-only classes (Settings API, admin menus)
-├── includes/                   # Core plugin classes
-│   ├── class-loader.php        # Registers all add_action / add_filter calls
-│   ├── class-ajax.php          # AJAX handlers for the design customizer
-│   ├── class-pod-provider.php  # Provider interface (contract all adapters implement)
-│   ├── class-cpt-registrar.php # Registers pod_product + pod_design CPTs
-│   ├── class-product-importer.php  # Import Printful catalog → WooCommerce products
-│   ├── providers/              # One class per POD provider
-│   │   └── class-printful.php
-│   ├── WooCommerce/            # WooCommerce integration hooks
-│   │   └── class-integration.php
-│   ├── product-customizer/     # Design editing value objects + REST controller
-│   │   ├── class-design.php
-│   │   ├── class-design-element.php
-│   │   ├── class-design-storage.php
-│   │   ├── class-print-generator.php
-│   │   └── class-rest-controller.php
-│   ├── REST/                   # Sync REST endpoints
-│   │   └── class-controller.php
-│   └── Crons/                  # Cron scheduling and handlers
-│       └── class-scheduler.php
-├── public/                     # Shortcode renderer (frontend)
+├── pod-aggregator.php              # Bootstrap + plugin header (activation hooks here)
+├── uninstall.php                   # Clean removal — deletes CPTs, options, uploaded files
+├── admin/
+│   ├── class-admin.php           # Admin pages + AJAX handlers
+│   ├── class-settings.php        # Settings API — Printful/Printify/Gelato settings tabs
+│   └── class-product-import.php  # Product import UI
+├── includes/
+│   ├── class-loader.php          # Registers all add_action / add_filter calls
+│   ├── class-ajax.php            # AJAX handlers for the design customizer
+│   ├── class-pod-provider.php    # Provider interface (contract all adapters implement)
+│   ├── class-cpt-registrar.php  # Registers pod_product + pod_design CPTs
+│   ├── class-product-importer.php # Import provider catalog → WooCommerce products
+│   ├── providers/
+│   │   ├── class-printful.php   # Printful REST API adapter
+│   │   ├── class-printify.php   # Printify REST API adapter
+│   │   └── class-gelato.php     # Gelato REST API adapter
+│   ├── WooCommerce/
+│   │   └── class-integration.php # Cart, checkout, multi-provider order submission
+│   ├── REST/
+│   │   └── class-controller.php  # Sync webhook endpoints + get_webhook_url()
+│   ├── Crons/
+│   │   └── class-scheduler.php   # wp_schedule_event handlers
+│   └── CLI/
+│       ├── class-cli.php         # Registers `wp pod` WP-CLI group
+│       └── Commands/
+│           ├── class-sync-products.php   # wp pod syncProducts
+│           ├── class-sync-orders.php     # wp pod syncOrders
+│           └── class-test-connection.php # wp pod testConnection
+├── public/
+│   └── class-customizer-editor.php # [pod_customizer] shortcode renderer
 ├── tests/
-│   ├── bootstrap.php           # WordPress function mocks + Composer autoload
+│   ├── bootstrap.php             # WordPress function mocks + Composer autoload
+│   ├── validate_tests.py         # Python static analysis (syntax, class/method checks)
 │   └── phpunit/
-│       ├── unit/               # 9 test files — run without WordPress
-│       └── integration/        # Live WP+WC tests (empty — see "Writing Integration Tests")
+│       └── unit/                 # 18 unit test files — run without WordPress
 └── scripts/
-    └── build.sh                # Release ZIP builder
+    └── build.sh                  # Release ZIP builder
 ```
 
 ---
@@ -67,7 +74,7 @@ Green dots = working test suite.
 | Composer | 2.x | `composer --version` |
 | Git | any recent | `git --version` |
 | PHPUnit | 9.6 (via Composer) | `./vendor/bin/phpunit --version` |
-| PHP extensions | `gd`, `mbstring`, `curl`, `json`, `xml` | `php -m \| grep -E "gd\|mbstring\|curl"` |
+| PHP extensions | `gd`, `mbstring`, `curl`, `json`, `xml` | `php -m | grep -E "gd|mbstring|curl"` |
 | WordPress (integration tests) | 6.9 | See below |
 | WP-CLI (optional) | 2.x | `wp --version` |
 
@@ -147,7 +154,7 @@ composer test:coverage
 open coverage/index.html
 
 # Single test file
-./vendor/bin/phpunit tests/phpunit/unit/class-design-test.php
+./vendor/bin/phpunit tests/phpunit/unit/class-printify-adapter-test.php
 
 # Tests matching a name
 ./vendor/bin/phpunit --testsuite=unit --filter="testSanitize"
@@ -161,6 +168,21 @@ open coverage/index.html
 # Random order (catches hidden dependencies)
 ./vendor/bin/phpunit --testsuite=unit --random-order
 ```
+
+### Static Validation (No PHP Required)
+
+A Python script is provided for environments without PHP:
+
+```bash
+python3 tests/validate_tests.py
+```
+
+This checks:
+- PHP syntax (via Python's native tokenizer)
+- Class declarations exist in expected files
+- Test method naming conventions (`test*`)
+- Source file existence for each test file
+- Brace balance in PHP files
 
 ---
 
@@ -186,7 +208,7 @@ function wp_remote_post(string $url, array $args = []) {
 
 ### Integration Tests (`tests/phpunit/integration/`)
 
-These hit the **real WordPress database** — actual CPT posts, real HTTP calls to Printful. The `tests/phpunit/integration/` directory is currently empty. To add tests:
+These hit the **real WordPress database** — actual CPT posts, real HTTP calls to providers. The `tests/phpunit/integration/` directory is currently empty. To add tests:
 
 ```bash
 wp scaffold package-tests .
@@ -228,7 +250,7 @@ Key attributes:
 | `failOnWarning` | `true` | Treat PHP warnings as failures |
 | `executionOrder` | `depends,defects` | Run tests in dependency order; failed tests first |
 
-Coverage excludes `includes/providers/class-printful.php` (live API calls). The `WP_TESTS_MULTISITE=1` env var activates multisite mock mode.
+Coverage excludes `includes/providers/` (live API calls). The `WP_TESTS_MULTISITE=1` env var activates multisite mock mode.
 
 ---
 
@@ -281,7 +303,7 @@ class Class_Name_Test extends TestCase
         $this->assertSame('expected_value', Class_Name::CONSTANT_NAME);
     }
 
-    // ── Constructor ────────────────────────────────────────────────────────
+    // ── Constructor ───────────────────────────────────────────────────────
 
     public function testConstructorAcceptsArray(): void
     {
@@ -455,31 +477,44 @@ git commit --no-verify -m "Emergency: pushing without tests"
 
 ## WP-CLI Commands
 
+All commands are under the `wp pod` group.
+
 ### Sync Products
 
 ```bash
-wp pod-aggregator sync                      # Sync all products
-wp pod-aggregator sync --product_id=123     # Sync specific product
-wp pod-aggregator sync --refresh-catalog    # Force full catalog refresh
-wp pod-aggregator sync --dry-run            # Show what would sync
-wp pod-aggregator sync --unlock             # Clear stuck sync lock
+wp pod syncProducts                          # Sync all products from all configured providers
+wp pod syncProducts --provider=printify      # Sync only from Printify
+wp pod syncProducts --provider=printful     # Sync only from Printful
+wp pod syncProducts --provider=gelato       # Sync only from Gelato
+wp pod syncProducts --limit=50              # Limit to 50 products per provider
+wp pod syncProducts --import-images         # Also download and attach product images
 ```
 
-### Manage Designs
+### Sync Orders
 
 ```bash
-wp pod-aggregator design list                          # List all saved designs
-wp pod-aggregator design delete a1b2c3d4-...          # Delete by UUID
-wp pod-aggregator design export a1b2c3d4-... > d.json  # Export as JSON
+wp pod syncOrders                            # Sync order status for all providers
+wp pod syncOrders --provider=printify       # Sync only Printify orders
+wp pod syncOrders --days=7                  # Only orders from the last 7 days
+wp pod syncOrders --limit=100                # Limit to 100 orders per provider
+```
+
+### Test Connection
+
+```bash
+wp pod testConnection                        # Test all configured providers
+wp pod testConnection --provider=printful   # Test only Printful
+wp pod testConnection --provider=printify   # Test only Printify
+wp pod testConnection --provider=gelato     # Test only Gelato
 ```
 
 ### Cron
 
 ```bash
-wp cron event list
-wp cron event run pod_aggregator_hourly_sync           # Run sync immediately
-wp cron event run --all
-wp cron event delete pod_aggregator_hourly_sync        # Delete scheduled sync events
+wp cron event list                                   # List all scheduled events
+wp cron event run pod_aggregator_sync_products       # Run product sync immediately
+wp cron event run pod_aggregator_sync_order_status   # Run order sync immediately
+wp cron event delete pod_aggregator_sync_products    # Remove scheduled product sync
 ```
 
 ---
@@ -585,9 +620,10 @@ composer install --no-interaction
 | PSR-4 namespaced classes in `includes/` | Avoids global function/constant collisions |
 | Single bootstrap file `pod-aggregator.php` | WordPress loads one main plugin file — keeps activation hooks simple |
 | Value objects (`Design`, `Design_Element`) | Immutable, easy to test, no hidden state |
-| Provider interface (`class-pod-provider.php`) | Adding Printify/Gelato = implement one interface |
+| Provider interface (`POD_Provider`) | Adding a new provider = implement the interface + add settings |
 | CPT for designs (`pod_design`) | Design data independent of WooCommerce order data |
 | Settings API (not custom options page) | Leverages WordPress's built-in security (nonces, capabilities, sanitization) |
+| Multi-adapter pattern | Each provider is isolated — one provider's bug can't break another |
 
 ### Request Lifecycle — Frontend
 
@@ -616,11 +652,13 @@ WooCommerce Checkout completed
     ↓
 hook: woocommerce_checkout_order_processed
     ↓
-WooCommerce\Integration::submit_order_to_provider()
+WooCommerce\Integration::forward_order_to_provider()
     ↓
-Printful Adapter: POST to Printful API
+Splits order items by provider (multi-provider order support)
     ↓
-Printful response stored in WC order meta
+Each provider adapter: POST to provider API (with exponential backoff retry)
+    ↓
+Provider order ID stored in WC order meta (e.g. _pod_printify_order_id)
     ↓
 WooCommerce order note added
 ```
@@ -654,22 +692,25 @@ composer test:unit
 # 2. Linting
 composer lint
 
-# 3. Coverage (open coverage/index.html and check your changed files)
+# 3. Static validation (no PHP required)
+python3 tests/validate_tests.py
+
+# 4. Coverage (open coverage/index.html and check your changed files)
 composer test:coverage
 
-# 4. Build dry-run
+# 5. Build dry-run
 ./scripts/build.sh check
 ```
 
 ### Commit Message Format
 
 ```
-Add Printify adapter
+Add Gelato adapter
 
-- Implement Printify_Adapter extending POD_Provider
-- Add printify-api-key field to Settings page
-- Add integration tests for variant sync
-- Update README with Printify setup instructions
+- Implement Gelato_Adapter extending POD_Provider
+- Add gelato-api-key field to Settings page
+- Add webhook signature verification for Gelato webhooks
+- Update README with Gelato setup instructions
 Fixes: Closes #XX
 ```
 
@@ -679,6 +720,7 @@ Before opening a PR, confirm:
 
 - [ ] `composer test:unit` passes
 - [ ] `composer lint` passes (or deviations documented and justified)
+- [ ] `python3 tests/validate_tests.py` passes
 - [ ] New behaviour has unit tests
 - [ ] New behaviour has integration tests (if applicable)
 - [ ] README is updated if user-facing behaviour changed
@@ -688,6 +730,7 @@ Before opening a PR, confirm:
 ### Code Review Criteria
 
 PRs are reviewed for:
+
 - **Correctness** — Does it solve the stated problem?
 - **Security** — Nonces, capabilities, sanitisation, escaping?
 - **Performance** — N+1 queries, unnecessary DB writes, heavy operations in hot paths?
@@ -711,6 +754,7 @@ grep "Version:" pod-aggregator.php
 composer test
 composer test:coverage  # review coverage
 composer lint
+python3 tests/validate_tests.py
 ```
 
 ### Step 3 — Build the Release ZIP
@@ -730,13 +774,13 @@ Output: `pod-aggregator.zip` and `pod-aggregator/trunk/` staged directory.
 ```bash
 wp plugin install ./pod-aggregator.zip --activate-network
 wp plugin list --status=active | grep pod-aggregator
-wp pod-aggregator sync --dry-run
+wp pod testConnection
 ```
 
 ### Step 5 — Tag and Release
 
 ```bash
-git tag -a v1.3.0 -m "Release v1.3.0 — Add Printify adapter"
+git tag -a v1.3.0 -m "Release v1.3.0 — Multi-provider support (Printify + Gelato)"
 git push upstream v1.3.0
 
 # On GitHub: draft a new Release, attach pod-aggregator.zip
