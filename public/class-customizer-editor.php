@@ -1,3 +1,4 @@
+<?php
 /**
  * POD Aggregator — Product Customizer Canvas Editor
  *
