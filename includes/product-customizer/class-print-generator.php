@@ -44,6 +44,13 @@ class Print_Generator
      */
     public function generate(Design $design)
     {
+        if (!extension_loaded('gd')) {
+            return new WP_Error(
+                'pod_gd_missing',
+                __('GD image extension is required for print file generation.', 'pod-aggregator')
+            );
+        }
+
         $validate = $design->validate();
         if (is_wp_error($validate)) {
             return $validate;
@@ -123,6 +130,18 @@ class Print_Generator
      */
     public function generate_preview(Design $design, int $max_width = 600)
     {
+        if (!extension_loaded('gd')) {
+            return new WP_Error(
+                'pod_gd_missing',
+                __('GD image extension is required for preview generation.', 'pod-aggregator')
+            );
+        }
+
+        $validate = $design->validate();
+        if (is_wp_error($validate)) {
+            return $validate;
+        }
+
         $dims = $design->get_print_dimensions();
         $print_width  = $dims['width_px'];
         $print_height = $dims['height_px'];

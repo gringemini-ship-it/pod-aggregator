@@ -62,14 +62,27 @@ class CPT_Registrar
 }
 
 /**
- * Return the active provider adapter by slug.
+ * Return the active provider adapter by slug, or all configured providers.
  *
- * @param string $slug Provider slug (e.g. 'printful').
- * @return Provider_Interface|null
+ * @param string $slug Provider slug (e.g. 'printful'). When empty, returns all configured providers.
+ * @return Provider_Interface|Provider_Interface[]|null Single provider, array of providers, or null if not found.
  */
-function pod_aggregator_get_provider(string $slug): ?Provider_Interface
+function pod_aggregator_get_provider(string $slug = '')
 {
     static $adapters = [];
+
+    // Return all configured providers when no slug given.
+    if ($slug === '') {
+        $all_slugs = ['printful', 'printify', 'gelato'];
+        $configured = [];
+        foreach ($all_slugs as $s) {
+            $provider = pod_aggregator_get_provider($s);
+            if ($provider && $provider->is_configured()) {
+                $configured[] = $provider;
+            }
+        }
+        return $configured;
+    }
 
     if (isset($adapters[$slug])) {
         return $adapters[$slug];

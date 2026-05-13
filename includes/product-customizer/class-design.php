@@ -343,6 +343,10 @@ class Design implements Countable, IteratorAggregate, JsonSerializable
             return new \WP_Error('pod_design_invalid', __('Invalid print area.', 'pod-aggregator'));
         }
 
+        if (empty($this->elements)) {
+            return new \WP_Error('pod_design_invalid', __('Design must contain at least one element.', 'pod-aggregator'));
+        }
+
         foreach ($this->elements as $el) {
             if (!($el instanceof DesignElement)) {
                 return new \WP_Error('pod_design_invalid', __('Invalid element in design.', 'pod-aggregator'));

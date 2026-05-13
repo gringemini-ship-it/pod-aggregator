@@ -90,10 +90,10 @@ class Settings_Test extends TestCase
     // sanitize_settings is private — confirm it exists
     // -------------------------------------------------------------------------
 
-    public function testSanitizeSettingsIsPrivateMethod(): void
+    public function testSanitizeSettingsIsPublicMethod(): void
     {
         $refl = new \ReflectionMethod(Settings::class, 'sanitize_settings');
-        $this->assertTrue($refl->isPrivate());
+        $this->assertTrue($refl->isPublic());
     }
 
     public function testSanitizeSettingsAcceptsArrayParameter(): void

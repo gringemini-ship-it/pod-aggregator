@@ -90,63 +90,39 @@ class Design_Storage_Test extends TestCase
     // get() validation
     // -------------------------------------------------------------------------
 
-    public function testGetRejectsZeroPostId(): void
+    public function testGetReturnsNullForNonExistentDesign(): void
     {
         $storage = new Design_Storage();
-        $result = $storage->get(0);
+        // get() searches by UUID string; non-existent returns null
+        $result = $storage->get('non-existent-uuid');
 
-        $this->assertInstanceOf(\WP_Error::class, $result);
-        $this->assertSame('invalid_post_id', $result->get_error_code());
-    }
-
-    public function testGetRejectsNegativePostId(): void
-    {
-        $storage = new Design_Storage();
-        $result = $storage->get(-1);
-
-        $this->assertInstanceOf(\WP_Error::class, $result);
+        $this->assertNull($result);
     }
 
     // -------------------------------------------------------------------------
-    // delete() validation
+    // delete() returns false for non-existent
     // -------------------------------------------------------------------------
 
-    public function testDeleteRejectsZeroPostId(): void
+    public function testDeleteReturnsFalseForNonExistentDesign(): void
     {
         $storage = new Design_Storage();
-        $result = $storage->delete(0);
+        // delete() searches by UUID string; non-existent returns false
+        $result = $storage->delete('non-existent-uuid');
 
-        $this->assertInstanceOf(\WP_Error::class, $result);
-        $this->assertSame('invalid_post_id', $result->get_error_code());
-    }
-
-    public function testDeleteRejectsNegativePostId(): void
-    {
-        $storage = new Design_Storage();
-        $result = $storage->delete(-5);
-
-        $this->assertInstanceOf(\WP_Error::class, $result);
+        $this->assertFalse($result);
     }
 
     // -------------------------------------------------------------------------
-    // get_for_product() validation
+    // get_for_product() returns empty array for no results
     // -------------------------------------------------------------------------
 
-    public function testGetForProductRejectsZeroProductId(): void
+    public function testGetForProductReturnsEmptyArrayWhenNoDesigns(): void
     {
         $storage = new Design_Storage();
         $result = $storage->get_for_product(0);
 
-        $this->assertInstanceOf(\WP_Error::class, $result);
-        $this->assertSame('invalid_product_id', $result->get_error_code());
-    }
-
-    public function testGetForProductRejectsNegativeProductId(): void
-    {
-        $storage = new Design_Storage();
-        $result = $storage->get_for_product(-10);
-
-        $this->assertInstanceOf(\WP_Error::class, $result);
+        $this->assertIsArray($result);
+        $this->assertEmpty($result);
     }
 
     // -------------------------------------------------------------------------

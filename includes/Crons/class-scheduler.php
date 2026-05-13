@@ -39,13 +39,15 @@ class Scheduler
             return;
         }
 
-        foreach ($all_providers as $slug => $provider) {
+        foreach ($all_providers as $provider) {
+            $slug = $provider->get_slug();
+
             // If a specific provider was requested, skip all others.
             if ($provider_slug !== '' && $slug !== $provider_slug) {
                 continue;
             }
 
-            if (!$provider || !$provider->is_configured()) {
+            if (!$provider->is_configured()) {
                 continue;
             }
 
@@ -102,14 +104,24 @@ class Scheduler
                 continue;
             }
 
-            // If tracking is available, update the WooCommerce order.
+            $order = wc_get_order((int) $row['order_id']);
+            if (!$order) {
+                continue;
+            }
+
+            // Map provider status to WooCommerce order status.
+            $provider_status = $status_data['status'] ?? '';
+            $fulfilled_statuses = ['fulfilled', 'completed', 'shipped', 'delivered'];
+
+            if (in_array($provider_status, $fulfilled_statuses, true)) {
+                $order->update_status('completed');
+            }
+
+            // If tracking is available, update the WooCommerce order meta.
             if (!empty($status_data['tracking_number'])) {
-                $order = wc_get_order((int) $row['order_id']);
-                if ($order) {
-                    $order->update_meta_data('_pod_tracking_number', $status_data['tracking_number']);
-                    $order->update_meta_data('_pod_tracking_url', $status_data['tracking_url'] ?? '');
-                    $order->save();
-                }
+                $order->update_meta_data('_pod_tracking_number', $status_data['tracking_number']);
+                $order->update_meta_data('_pod_tracking_url', $status_data['tracking_url'] ?? '');
+                $order->save();
             }
         }
 
@@ -124,14 +136,12 @@ class Scheduler
      */
     public static function schedule_crons()
     {
-        $interval = 'pod_aggregator_sync_interval';
-
         if (!wp_next_scheduled(self::HOOK_PRODUCT_SYNC)) {
-            wp_schedule_event(time(), $interval, self::HOOK_PRODUCT_SYNC);
+            wp_schedule_event(time(), 'pod_aggregator_sync_interval', self::HOOK_PRODUCT_SYNC);
         }
 
         if (!wp_next_scheduled(self::HOOK_ORDER_SYNC)) {
-            wp_schedule_event(time(), $interval, self::HOOK_ORDER_SYNC);
+            wp_schedule_event(time(), 'pod_aggregator_order_sync_interval', self::HOOK_ORDER_SYNC);
         }
     }
 
@@ -254,7 +264,7 @@ class Scheduler
                 'created_at'   => current_time('mysql'),
                 'updated_at'   => current_time('mysql'),
             ],
-            ['%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s']
+            ['%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s']
         );
     }
 }

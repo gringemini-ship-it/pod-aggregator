@@ -31,6 +31,7 @@ class Settings
                 'type'              => 'array',
                 'sanitize_callback' => [$this, 'sanitize_settings'],
                 'default'           => [],
+                'network'           => true,
             ]
         );
 
@@ -502,6 +503,9 @@ class Settings
         $sanitized['sync_interval_hours'] = absint($input['sync_interval_hours'] ?? 6);
         if ($sanitized['sync_interval_hours'] < 1) {
             $sanitized['sync_interval_hours'] = 1;
+        }
+        if ($sanitized['sync_interval_hours'] > 168) {
+            $sanitized['sync_interval_hours'] = 168;
         }
 
         // Validate Printful API key with a quick test request.

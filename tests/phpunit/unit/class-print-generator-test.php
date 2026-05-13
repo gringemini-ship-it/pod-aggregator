@@ -92,7 +92,7 @@ class Print_Generator_Test extends TestCase
         $design = new Design([]); // no product_id
         $design->add_element(DesignElement::text('Hello', 0, 0));
 
-        $result = $this->generator->generate_preview($design, 'front');
+        $result = $this->generator->generate_preview($design, 600);
 
         $this->assertInstanceOf(\WP_Error::class, $result);
     }
@@ -101,7 +101,7 @@ class Print_Generator_Test extends TestCase
     {
         $design = new Design(['product_id' => 1, 'area' => 'front']);
 
-        $result = $this->generator->generate_preview($design, 'front');
+        $result = $this->generator->generate_preview($design, 600);
 
         $this->assertInstanceOf(\WP_Error::class, $result);
     }

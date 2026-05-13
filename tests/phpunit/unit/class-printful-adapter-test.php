@@ -8,7 +8,7 @@
  *   - get_products(): array|WP_Error
  *   - get_product(int $id): array|WP_Error
  *   - get_product_variants(int $product_id): array|WP_Error
- *   - calculate_price(float $base_cost, float $markup_percent): float
+ *   - calculate_price(array $variant, float $retail_price = 0.0): float
  *   - submit_order(int $order_id, array $order_data): array|WP_Error
  *   - get_mockups(int $product_id): array|WP_Error
  *   - get_order_status(string $external_order_id): array|WP_Error
@@ -51,7 +51,7 @@ class Printful_Adapter_Test extends TestCase
 
     public function testIsConfiguredReturnsTrueWhenApiKeySet(): void
     {
-        update_site_option('pod_aggregator_printful_api_key', 'TEST_KEY_123');
+        update_site_option('pod_aggregator_settings', ['printful_api_key' => 'TEST_KEY_123']);
         $adapter = new Printful_Adapter();
 
         $this->assertTrue($adapter->is_configured());
@@ -59,7 +59,7 @@ class Printful_Adapter_Test extends TestCase
 
     public function testIsConfiguredReturnsFalseWhenApiKeyEmpty(): void
     {
-        update_site_option('pod_aggregator_printful_api_key', '');
+        update_site_option('pod_aggregator_settings', ['printful_api_key' => '']);
         $adapter = new Printful_Adapter();
 
         $this->assertFalse($adapter->is_configured());
@@ -67,7 +67,7 @@ class Printful_Adapter_Test extends TestCase
 
     public function testIsConfiguredReturnsFalseWhenApiKeyNotSet(): void
     {
-        delete_site_option('pod_aggregator_printful_api_key');
+        update_site_option('pod_aggregator_settings', []);
         $adapter = new Printful_Adapter();
 
         $this->assertFalse($adapter->is_configured());
@@ -77,41 +77,43 @@ class Printful_Adapter_Test extends TestCase
     // calculate_price()
     // -------------------------------------------------------------------------
 
-    public function testCalculatePriceAppliesMarkup(): void
+    public function testCalculatePriceAppliesDefaultMarkup(): void
     {
         $adapter = new Printful_Adapter();
 
-        $result = $adapter->calculate_price(100.00, 20.0);
+        // Cost 100.00 * 1.30 = 130.00
+        $result = $adapter->calculate_price(['cost' => 100.00]);
 
-        $this->assertSame(120.00, $result);
+        $this->assertSame(130.00, $result);
     }
 
-    public function testCalculatePriceWithZeroMarkup(): void
+    public function testCalculatePriceWithRetailPriceOverride(): void
     {
         $adapter = new Printful_Adapter();
 
-        $result = $adapter->calculate_price(50.00, 0.0);
+        // Retail price override returns the retail price directly.
+        $result = $adapter->calculate_price(['cost' => 50.00], 75.00);
 
-        $this->assertSame(50.00, $result);
+        $this->assertSame(75.00, $result);
     }
 
-    public function testCalculatePriceWithHighMarkup(): void
+    public function testCalculatePriceWithZeroCost(): void
     {
         $adapter = new Printful_Adapter();
 
-        $result = $adapter->calculate_price(100.00, 50.0);
+        $result = $adapter->calculate_price(['cost' => 0]);
 
-        $this->assertSame(150.00, $result);
+        $this->assertSame(0.0, $result);
     }
 
-    public function testCalculatePriceWithFractionalBaseCost(): void
+    public function testCalculatePriceWithFractionalCost(): void
     {
         $adapter = new Printful_Adapter();
 
-        $result = $adapter->calculate_price(19.99, 15.0);
+        // 19.99 * 1.30 = 25.987 → rounds to 25.99
+        $result = $adapter->calculate_price(['cost' => 19.99]);
 
-        // 19.99 * 1.15 = 22.9885 → rounds to 22.99
-        $this->assertEqualsWithDelta(22.99, $result, 0.01);
+        $this->assertEqualsWithDelta(25.99, $result, 0.01);
     }
 
     // -------------------------------------------------------------------------
@@ -157,14 +159,25 @@ class Printful_Adapter_Test extends TestCase
 
     public function testSubmitOrderReturnsArray(): void
     {
-        update_site_option('pod_aggregator_printful_api_key', 'TEST_KEY');
+        update_site_option('pod_aggregator_settings', ['printful_api_key' => 'TEST_KEY']);
         $adapter = new Printful_Adapter();
 
-        $result = $adapter->submit_order(1, [
+        $result = $adapter->submit_order([
             'items' => [
-                ['variant_id' => 123, 'quantity' => 1, 'price' => '15.00'],
+                ['variant_id' => 123, 'qty' => 1, 'price' => '15.00'],
             ],
             'shipping' => 'STANDARD',
+            'woo_order_id' => 1,
+            'shipping_address' => [
+                'name'     => 'Test User',
+                'address1' => '123 Main St',
+                'city'     => 'Anytown',
+                'state'    => 'CA',
+                'country'  => 'US',
+                'zip'      => '90210',
+                'phone'    => '555-0100',
+                'email'    => 'test@example.com',
+            ],
         ]);
 
         $this->assertIsArray($result);

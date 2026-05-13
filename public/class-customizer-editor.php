@@ -16,7 +16,7 @@
  * @package POD_Aggregator\Public
  */
 
-namespace POD_Aggregator\Public0;
+namespace POD_Aggregator\Public;
 
 class POD_Customizer_Editor
 {

@@ -205,21 +205,15 @@ class REST_Controller_Test extends TestCase
     // We test it indirectly by verifying it EXISTS as a private method
     // -------------------------------------------------------------------------
 
-    public function testNormalizeDesignDataIsPrivateMethod(): void
+    public function testSanitizeDesignDataIsPrivateMethod(): void
     {
-        $refl = new \ReflectionMethod(REST_Controller::class, 'normalize_design_data');
+        $refl = new \ReflectionMethod(REST_Controller::class, 'sanitize_design_data');
         $this->assertTrue($refl->isPrivate());
     }
 
     public function testSanitizeElementIsPrivateMethod(): void
     {
         $refl = new \ReflectionMethod(REST_Controller::class, 'sanitize_element');
-        $this->assertTrue($refl->isPrivate());
-    }
-
-    public function testValidateElementIsPrivateMethod(): void
-    {
-        $refl = new \ReflectionMethod(REST_Controller::class, 'validate_element');
         $this->assertTrue($refl->isPrivate());
     }
 }

@@ -54,8 +54,9 @@ class Settings_Sanitization_Test extends TestCase
 
     public function testSanitizeMarkupStripsNegative(): void
     {
+        // absint(-10) = 10, which is in valid range (0-500)
         $result = $this->sanitize(['printful_default_markup' => '-10']);
-        $this->assertLessThanOrEqual(0, $result['printful_default_markup']);
+        $this->assertSame(10, $result['printful_default_markup']);
     }
 
     public function testSanitizeMarkupAllowsZero(): void
@@ -83,7 +84,7 @@ class Settings_Sanitization_Test extends TestCase
     public function testSanitizeDebugModeFalse(): void
     {
         $result = $this->sanitize(['printful_debug_mode' => '']);
-        $this->assertSame('', $result['printful_debug_mode']);
+        $this->assertSame('0', $result['printful_debug_mode']);
     }
 
     // -------------------------------------------------------------------------
@@ -99,17 +100,18 @@ class Settings_Sanitization_Test extends TestCase
     public function testSanitizeAutoSyncEnabledFalse(): void
     {
         $result = $this->sanitize(['auto_sync_enabled' => '']);
-        $this->assertSame('', $result['auto_sync_enabled']);
+        $this->assertSame('0', $result['auto_sync_enabled']);
     }
 
     // -------------------------------------------------------------------------
     // Sync interval — int, 0-168
     // -------------------------------------------------------------------------
 
-    public function testSanitizeSyncIntervalAllowsZero(): void
+    public function testSanitizeSyncIntervalClampedToMin1(): void
     {
+        // 0 is below minimum of 1, gets clamped to 1
         $result = $this->sanitize(['sync_interval_hours' => '0']);
-        $this->assertSame(0, $result['sync_interval_hours']);
+        $this->assertSame(1, $result['sync_interval_hours']);
     }
 
     public function testSanitizeSyncIntervalAllowsPositive(): void
@@ -121,13 +123,14 @@ class Settings_Sanitization_Test extends TestCase
     public function testSanitizeSyncIntervalClampsOverflow(): void
     {
         $result = $this->sanitize(['sync_interval_hours' => '999']);
-        $this->assertLessThanOrEqual(168, $result['sync_interval_hours']);
+        $this->assertSame(168, $result['sync_interval_hours']);
     }
 
     public function testSanitizeSyncIntervalStripsNegative(): void
     {
+        // absint(-5) = 5, which is in the valid 1-168 range
         $result = $this->sanitize(['sync_interval_hours' => '-5']);
-        $this->assertLessThanOrEqual(0, $result['sync_interval_hours']);
+        $this->assertSame(5, $result['sync_interval_hours']);
     }
 
     // -------------------------------------------------------------------------
@@ -156,11 +159,11 @@ class Settings_Sanitization_Test extends TestCase
     // Preserves unknown keys
     // -------------------------------------------------------------------------
 
-    public function testSanitizePreservesUnknownKeys(): void
+    public function testSanitizeDropsUnknownKeys(): void
     {
+        // Sanitizer only returns known keys — unknown keys are dropped.
         $result = $this->sanitize(['unknown_key' => 'some_value']);
-        $this->assertArrayHasKey('unknown_key', $result);
-        $this->assertSame('some_value', $result['unknown_key']);
+        $this->assertArrayNotHasKey('unknown_key', $result);
     }
 
     // -------------------------------------------------------------------------

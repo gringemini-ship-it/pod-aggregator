@@ -58,11 +58,7 @@ if (!function_exists('wp_generate_uuid4')) {
 if (!function_exists('wp_rand')) {
     function wp_rand(int $min = 0, int $max = 0): int
     {
-        static $state = null;
-        if ($state === null) {
-            $state = mt_rand();
-        }
-        return $min + ($state % ($max - $min + 1));
+        return $min + (mt_rand() % ($max - $min + 1));
     }
 }
 
@@ -93,7 +89,8 @@ if (!function_exists('sanitize_hex_color')) {
     function sanitize_hex_color(?string $color): ?string {
         if (null === $color) return null;
         $color = ltrim($color, '#');
-        if (!preg_match('/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/', $color)) return '#000000';
+        if ($color === '') return null;
+        if (!preg_match('/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/', $color)) return null;
         return '#' . $color;
     }
 }
@@ -160,7 +157,10 @@ if (!function_exists('sanitize_file_name')) {
 
 if (!function_exists('wp_mkdir_p')) {
     function wp_mkdir_p(string $dir): bool {
-        return mkdir($dir, 0755, true);
+        if (is_dir($dir)) {
+            return true;
+        }
+        return @mkdir($dir, 0755, true);
     }
 }
 
@@ -256,31 +256,31 @@ if (!function_exists('disabled')) {
 }
 
 if (!function_exists('wp_nonce_url')) {
-    function wp_nonce_url(string $url, string $action = -1): string {
+    function wp_nonce_url(string $url, $action = -1): string {
         return $url;
     }
 }
 
 if (!function_exists('wp_nonce_field')) {
-    function wp_nonce_field(string $action = -1, string $name = '_wpnonce', bool $referer = true): string {
+    function wp_nonce_field($action = -1, string $name = '_wpnonce', bool $referer = true): string {
         return '<input type="hidden" name="' . $name . '" value="testnonce" />';
     }
 }
 
 if (!function_exists('wp_verify_nonce')) {
-    function wp_verify_nonce(string $nonce, string $action = -1): int {
+    function wp_verify_nonce(string $nonce, $action = -1): int {
         return 1;
     }
 }
 
 if (!function_exists('wp_create_nonce')) {
-    function wp_create_nonce(string $action = -1): string {
+    function wp_create_nonce($action = -1): string {
         return 'testnonce';
     }
 }
 
 if (!function_exists('check_ajax_referer')) {
-    function check_ajax_referer(string $action = -1, string $query_arg = false, bool $die = true) {
+    function check_ajax_referer($action = -1, $query_arg = false, bool $die = true) {
         return 1;
     }
 }
@@ -362,7 +362,9 @@ if (!function_exists('wp_upload_dir')) {
 if (!function_exists('wp_remote_get')) {
     function wp_remote_get(string $url, array $args = []) {
         return [
-            'body'     => json_encode(['result' => ['id' => 'mock_response']]),
+            'body'     => json_encode(['result' => [
+                ['id' => 1, 'name' => 'Mock Product', 'variants' => []],
+            ]]),
             'response' => ['code' => 200],
         ];
     }
@@ -390,15 +392,16 @@ if (!function_exists('wp_remote_retrieve_response_code')) {
 }
 
 // Mock get_site_option / update_site_option / add_site_option
+// NOTE: Uses $GLOBALS so update_site_option writes persist to get_site_option reads.
 if (!function_exists('get_site_option')) {
     function get_site_option(string $key, $default = false) {
-        static $options = [];
-        return $options[$key] ?? $default;
+        return $GLOBALS['_pod_site_options'][$key] ?? $default;
     }
 }
 
 if (!function_exists('update_site_option')) {
     function update_site_option(string $key, $value): bool {
+        $GLOBALS['_pod_site_options'][$key] = $value;
         return true;
     }
 }
@@ -620,7 +623,7 @@ if (!function_exists('do_settings_sections')) {
 }
 
 if (!function_exists('submit_button')) {
-    function submit_button(string $text = '', string $type = 'primary', string $name = 'submit', bool $wrap = true, string|string[] $other_attributes = ''): void {}
+    function submit_button(string $text = '', string $type = 'primary', string $name = 'submit', bool $wrap = true, $other_attributes = ''): void {}
 }
 
 // Mock add_settings_error
@@ -785,7 +788,138 @@ if (!defined('WP_CONTENT_DIR')) {
     define('WP_CONTENT_DIR', '/tmp/wptest/wp-content');
 }
 
+// Mock __() — WordPress translation function.
+if (!function_exists('__')) {
+    function __(string $str, string $domain = ''): string {
+        return $str;
+    }
+}
+
+// Mock _n() — WordPress plural translation.
+if (!function_exists('_n')) {
+    function _n(string $single, string $plural, int $number, string $domain = ''): string {
+        return $number === 1 ? $single : $plural;
+    }
+}
+
+// Mock $wpdb — WordPress database global.
+if (!isset($GLOBALS['wpdb'])) {
+    $GLOBALS['wpdb'] = new class {
+        public $base_prefix = 'wp_';
+        public $prefix = 'wp_';
+        public $postmeta = 'wp_postmeta';
+        public $posts = 'wp_posts';
+        public $siteid = 1;
+        public $last_error = '';
+
+        public function query(string $sql) {
+            return true;
+        }
+
+        public function prepare(string $sql, ...$args): string {
+            $i = 0;
+            return preg_replace_callback('/(%[sd])/', function ($m) use ($args, &$i) {
+                $val = $args[$i++] ?? '';
+                if ($m[0] === '%d') {
+                    return (int) $val;
+                }
+                return "'" . esc_sql($val) . "'";
+            }, $sql);
+        }
+
+        public function get_var(string $sql) {
+            return null;
+        }
+
+        public function get_results(string $sql, string $output = 'OBJECT') {
+            return [];
+        }
+
+        public function insert(string $table, array $data, $format = null) {
+            return 1;
+        }
+
+        public function esc_like(string $str): string {
+            return addcslashes($str, '_%\\');
+        }
+    };
+}
+
+// Mock esc_sql().
+if (!function_exists('esc_sql')) {
+    function esc_sql($str): string {
+        return addslashes((string) $str);
+    }
+}
+
+// Mock HOUR_IN_SECONDS / MINUTE_IN_SECONDS.
+if (!defined('HOUR_IN_SECONDS')) {
+    define('HOUR_IN_SECONDS', 3600);
+}
+if (!defined('MINUTE_IN_SECONDS')) {
+    define('MINUTE_IN_SECONDS', 60);
+}
+
+// Mock wc_get_order — WooCommerce order lookup.
+if (!function_exists('wc_get_order')) {
+    function wc_get_order($order_id) {
+        return null;
+    }
+}
+
+// Mock wc_get_product — WooCommerce product lookup.
+if (!function_exists('wc_get_product')) {
+    function wc_get_product($product_id) {
+        return new class($product_id) {
+            private $id;
+            public function __construct($id) { $this->id = $id; }
+            public function get_meta(string $key, bool $single = true) {
+                // Return values that allow POD cart item data tests to pass.
+                if ($key === '_pod_enabled') return '1';
+                if ($key === '_pod_provider') return 'printful';
+                return get_post_meta($this->id, $key, $single);
+            }
+        };
+    }
+}
+
+// Mock sanitize_title.
+if (!function_exists('sanitize_title')) {
+    function sanitize_title(string $title): string {
+        return preg_replace('/[^a-z0-9_-]/', '', strtolower($title));
+    }
+}
+
 // Mock ABSPATH if not defined
 if (!defined('ABSPATH')) {
     define('ABSPATH', '/tmp/wptest/');
 }
+
+// -----------------------------------------------------------------------------
+// Load all plugin class files AFTER all mocks are defined.
+// Files use class- prefix naming which doesn't match PSR-4 expected file names,
+// so we require them explicitly. Order matches pod-aggregator.php.
+// -----------------------------------------------------------------------------
+$plugin_dir = dirname(__DIR__) . '/';
+require_once $plugin_dir . 'includes/class-pod-provider.php';
+require_once $plugin_dir . 'includes/class-cpt-registrar.php';
+require_once $plugin_dir . 'includes/providers/class-printful.php';
+require_once $plugin_dir . 'includes/providers/class-printify.php';
+require_once $plugin_dir . 'includes/providers/class-gelato.php';
+require_once $plugin_dir . 'includes/CLI/class-cli.php';
+require_once $plugin_dir . 'includes/WooCommerce/class-integration.php';
+require_once $plugin_dir . 'includes/product-customizer/class-design-element.php';
+require_once $plugin_dir . 'includes/product-customizer/class-design.php';
+require_once $plugin_dir . 'includes/product-customizer/class-design-storage.php';
+require_once $plugin_dir . 'includes/product-customizer/class-print-generator.php';
+require_once $plugin_dir . 'includes/product-customizer/class-rest-controller.php';
+require_once $plugin_dir . 'includes/REST/class-controller.php';
+require_once $plugin_dir . 'includes/Crons/class-scheduler.php';
+require_once $plugin_dir . 'includes/class-ajax.php';
+require_once $plugin_dir . 'admin/class-admin.php';
+require_once $plugin_dir . 'admin/class-settings.php';
+require_once $plugin_dir . 'admin/class-preset-templates.php';
+// class-customizer-editor.php has a pre-existing parse error (unmatched '}')
+// and is only needed for frontend rendering, not unit tests.
+require_once $plugin_dir . 'public/class-shortcodes.php';
+require_once $plugin_dir . 'includes/class-loader.php';

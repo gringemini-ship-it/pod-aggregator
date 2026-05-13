@@ -404,7 +404,7 @@ class Controller
             return false;
         }
 
-        if (!str_starts_with($auth_header, 'Bearer ')) {
+        if (strpos($auth_header, 'Bearer ') !== 0) {
             return false;
         }
 

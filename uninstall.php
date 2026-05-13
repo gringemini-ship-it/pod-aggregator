@@ -20,8 +20,24 @@ delete_site_option('pod_aggregator_tables_created');
 delete_site_option('pod_aggregator_last_product_sync');
 delete_site_option('pod_aggregator_last_order_sync');
 
-// Clear transients.
-delete_site_transient('pod_agg_printful_products_*');
+// Clear transients with known prefix.
+global $wpdb;
+if (is_multisite()) {
+    $wpdb->query(
+        $wpdb->prepare(
+            "DELETE FROM {$wpdb->sitemeta} WHERE meta_key LIKE %s AND site_id = %d",
+            $wpdb->esc_like('_site_transient_pod_agg_printful_products_') . '%',
+            $wpdb->siteid
+        )
+    );
+} else {
+    $wpdb->query(
+        $wpdb->prepare(
+            "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
+            $wpdb->esc_like('_transient_pod_agg_printful_products_') . '%'
+        )
+    );
+}
 
 // Clear scheduled cron events.
 wp_clear_scheduled_hook('pod_aggregator_sync_products');

@@ -64,8 +64,8 @@ class Sync_Products
 
         // Load all configured providers if no specific one requested.
         if ($provider_slug) {
-            $providers = [$provider_slug => pod_aggregator_get_provider($provider_slug)];
-            if (!$providers[$provider_slug]) {
+            $providers = [pod_aggregator_get_provider($provider_slug)];
+            if (!$providers[0]) {
                 \WP_CLI::error("Unknown provider: {$provider_slug}");
                 return;
             }
@@ -80,12 +80,14 @@ class Sync_Products
         $total_synced = 0;
         $total_failed = 0;
 
-        foreach ($providers as $slug => $provider) {
+        foreach ($providers as $provider) {
             if (!$provider || !$provider->is_configured()) {
+                $slug = $provider ? $provider->get_slug() : 'unknown';
                 \WP_CLI::warning("Provider '{$slug}' is not configured. Skipping.");
                 continue;
             }
 
+            $slug = $provider->get_slug();
             \WP_CLI::line("=== Syncing {$provider->get_name()} ({$slug}) ===");
 
             $products = $provider->get_products();

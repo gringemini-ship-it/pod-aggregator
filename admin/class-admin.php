@@ -229,9 +229,9 @@ class Admin
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('POD Aggregator Settings', 'pod-aggregator'); ?></h1>
-            <form action="<?php echo esc_url(network_admin_url('admin.php?page=pod-aggregator-settings')); ?>" method="post">
+            <form action="options.php" method="post">
                 <?php
-                settings_fields('pod_aggregator_settings_group');
+                settings_fields('pod_aggregator_settings');
                 do_settings_sections('pod_aggregator_settings');
                 submit_button();
                 ?>
@@ -429,10 +429,12 @@ class Admin
         $synced = 0;
         $errors = [];
 
-        foreach ($providers as $slug => $provider) {
+        foreach ($providers as $provider) {
             if (!$provider->is_configured()) {
                 continue;
             }
+
+            $slug = $provider->get_slug();
 
             try {
                 // Call sync_products() directly with manual=true for verbose output.

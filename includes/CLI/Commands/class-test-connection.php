@@ -41,7 +41,7 @@ class Test_Connection
         $provider_slug = $assoc_args['provider'] ?? null;
 
         if ($provider_slug) {
-            $providers = [$provider_slug => pod_aggregator_get_provider($provider_slug)];
+            $providers = [pod_aggregator_get_provider($provider_slug)];
         } else {
             $providers = pod_aggregator_get_provider();
         }
@@ -53,12 +53,14 @@ class Test_Connection
 
         $all_ok = true;
 
-        foreach ($providers as $slug => $provider) {
+        foreach ($providers as $provider) {
             if (!$provider) {
-                \WP_CLI::error("Unknown provider: {$slug}");
+                \WP_CLI::error('Unknown provider.');
                 $all_ok = false;
                 continue;
             }
+
+            $slug = $provider->get_slug();
 
             if (!$provider->is_configured()) {
                 \WP_CLI::warning("Provider '{$slug}' is not configured (no API key). Skipping.");

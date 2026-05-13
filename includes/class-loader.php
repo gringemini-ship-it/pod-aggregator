@@ -114,6 +114,12 @@ class Loader
                 ),
             ];
 
+            // Order status sync runs more frequently.
+            $schedules['pod_aggregator_order_sync_interval'] = [
+                'interval' => 5 * MINUTE_IN_SECONDS,
+                'display'  => __('Every 5 minutes', 'pod-aggregator'),
+            ];
+
             return $schedules;
         });
 

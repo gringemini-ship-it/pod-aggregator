@@ -11,27 +11,11 @@
 namespace POD_Aggregator\ProductCustomizer;
 
 /**
- * Supported element types.
- */
-const TYPE_TEXT     = 'text';
-const TYPE_IMAGE    = 'image';
-const TYPE_SHAPE    = 'shape';
-const TYPE_BARCODE  = 'barcode';
-
-/**
- * Supported shape types.
- */
-const SHAPE_CIRCLE  = 'circle';
-const SHAPE_RECT    = 'rect';
-const SHAPE_LINE    = 'line';
-const SHAPE_STAR    = 'star';
-
-/**
  * Design Element — immutable value object.
  *
  * Usage:
  *   $el = new DesignElement([
- *       'type'    => TYPE_TEXT,
+ *       'type'    => DesignElement::TYPE_TEXT,
  *       'text'    => 'Hello World',
  *       'x'       => 100,
  *       'y'       => 200,
@@ -47,6 +31,17 @@ const SHAPE_STAR    = 'star';
  */
 class DesignElement
 {
+    /** Supported element types. */
+    public const TYPE_TEXT     = 'text';
+    public const TYPE_IMAGE    = 'image';
+    public const TYPE_SHAPE    = 'shape';
+    public const TYPE_BARCODE  = 'barcode';
+
+    /** Supported shape types. */
+    public const SHAPE_CIRCLE  = 'circle';
+    public const SHAPE_RECT    = 'rect';
+    public const SHAPE_LINE    = 'line';
+    public const SHAPE_STAR    = 'star';
     /** @var string Element type. */
     private $type;
 
@@ -182,7 +177,7 @@ class DesignElement
 
     public function get_color(): string
     {
-        return sanitize_hex_color($this->attrs['color']) ?? '#000000';
+        return sanitize_hex_color($this->attrs['color']) ?: '#000000';
     }
 
     public function get_align(): string
@@ -230,12 +225,12 @@ class DesignElement
     {
         return $this->attrs['fill'] === 'transparent'
             ? 'transparent'
-            : (sanitize_hex_color($this->attrs['fill']) ?? 'transparent');
+            : (sanitize_hex_color($this->attrs['fill']) ?: 'transparent');
     }
 
     public function get_stroke(): string
     {
-        return sanitize_hex_color($this->attrs['stroke']) ?? '#000000';
+        return sanitize_hex_color($this->attrs['stroke']) ?: '#000000';
     }
 
     public function get_stroke_width(): int
@@ -279,6 +274,8 @@ class DesignElement
             'underline'    => $this->is_underline(),
             'src'          => $this->get_src(),
             'originalSrc'  => $this->get_original_src(),
+            'cropX'        => (int) $this->attrs['cropX'],
+            'cropY'        => (int) $this->attrs['cropY'],
             'scale'        => $this->get_scale(),
             'shape'        => $this->get_shape(),
             'fill'         => $this->get_fill(),

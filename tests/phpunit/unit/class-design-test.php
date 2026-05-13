@@ -77,7 +77,7 @@ class Design_Test extends TestCase
         $this->assertSame(0, $design->get_product_id());
         $this->assertSame('printful', $design->get_provider());
         $this->assertSame(300, $design->get_dpi());
-        $this->assertSame(0, $design->get_created_at()); // time() — check > 0
+        $this->assertGreaterThan(0, $design->get_created_at());
         $this->assertGreaterThan(0, $design->get_updated_at());
     }
 
@@ -363,14 +363,20 @@ class Design_Test extends TestCase
 
     public function testValidateFailsForMissingId(): void
     {
-        $design = new Design([]); // no id set
-        // Force the id to empty string for test
-        // Can't directly set private property, so test via from_array with empty id
-        $design->add_element(DesignElement::text('Hello', 0, 0));
+        // Use from_array with empty id to bypass UUID generation.
+        $design = Design::from_array([
+            'product_id' => 1,
+            'elements'   => [['type' => 'text', 'text' => 'Hello']],
+        ]);
+        // Force empty id
+        $refl = new \ReflectionClass($design);
+        $prop = $refl->getProperty('id');
+        $prop->setAccessible(true);
+        $prop->setValue($design, '');
 
         $result = $design->validate();
-        // Actually the design has a generated UUID so it should pass the id check
-        $this->assertTrue($result);
+        $this->assertInstanceOf(\WP_Error::class, $result);
+        $this->assertSame('pod_design_invalid', $result->get_error_code());
     }
 
     public function testValidateFailsForMissingProductId(): void
@@ -423,9 +429,12 @@ class Design_Test extends TestCase
 
         $this->assertArrayHasKey('width_px', $dims);
         $this->assertArrayHasKey('height_px', $dims);
-        // Front area: 300mm x 25.4 = 11.81 inches * 300 = 3543 px
-        $this->assertGreaterThan(3000, $dims['width_px']);
-        $this->assertSame($dims['width_px'], $dims['height_px']); // square for front
+        // Front area: 300mm x 400mm at 300 DPI
+        // width  = ceil(300 / 25.4 * 300) = 3544
+        // height = ceil(400 / 25.4 * 300) = 4725
+        $this->assertSame(3544, $dims['width_px']);
+        $this->assertSame(4725, $dims['height_px']);
+        $this->assertGreaterThan($dims['width_px'], $dims['height_px']);
     }
 
     public function testGetPrintDimensionsAt150Dpi(): void
@@ -434,10 +443,10 @@ class Design_Test extends TestCase
         $dims = $design->get_print_dimensions();
 
         $this->assertGreaterThan(1000, $dims['width_px']);
-        // 150 DPI should be exactly half of 300 DPI
+        // 150 DPI should be approximately half of 300 DPI (ceil may cause off-by-one)
         $design300 = new Design(['area' => 'front', 'dpi' => 300]);
         $dims300 = $design300->get_print_dimensions();
-        $this->assertSame($dims300['width_px'] / 2, $dims['width_px']);
+        $this->assertEqualsWithDelta($dims300['width_px'] / 2, $dims['width_px'], 1);
     }
 
     public function testPxToMm(): void
