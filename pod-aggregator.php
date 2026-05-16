@@ -28,6 +28,37 @@ define('POD_AGGREGATOR_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('POD_AGGREGATOR_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('POD_AGGREGATOR_PLUGIN_BASENAME', plugin_basename(__FILE__));
 
+// Load Composer autoloader if present (must be top-level so classes
+// are available during activation/deactivation hooks).
+if (file_exists(POD_AGGREGATOR_PLUGIN_DIR . 'vendor/autoload.php')) {
+    require_once POD_AGGREGATOR_PLUGIN_DIR . 'vendor/autoload.php';
+}
+
+// Load all class files at top-level so they are available during
+// activation, deactivation, and normal plugin loading. Order matters
+// for dependencies: Provider_Interface before provider adapters.
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-pod-provider.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-cpt-registrar.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/providers/class-printful.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/providers/class-printify.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/providers/class-gelato.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/CLI/class-cli.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/WooCommerce/class-integration.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-design-element.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-design.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-design-storage.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-print-generator.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-rest-controller.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/REST/class-controller.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/Crons/class-scheduler.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-ajax.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'admin/class-admin.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'admin/class-settings.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'admin/class-preset-templates.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'public/class-customizer-editor.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'public/class-shortcodes.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-loader.php';
+
 /**
  * Code that runs during the plugin loading.
  */
@@ -39,43 +70,6 @@ function pod_aggregator_load()
         false,
         dirname(POD_AGGREGATOR_PLUGIN_BASENAME) . '/languages'
     );
-
-    // Load Composer autoloader if present.
-    if (file_exists(POD_AGGREGATOR_PLUGIN_DIR . 'vendor/autoload.php')) {
-        require_once POD_AGGREGATOR_PLUGIN_DIR . 'vendor/autoload.php';
-    }
-
-    // Load our classes (order matters for dependencies).
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-pod-provider.php';
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-cpt-registrar.php';
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/providers/class-printful.php';
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/providers/class-printify.php';
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/providers/class-gelato.php';
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/CLI/class-cli.php';
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/WooCommerce/class-integration.php';
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-design-element.php';
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-design.php';
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-design-storage.php';
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-print-generator.php';
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-rest-controller.php';
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/REST/class-controller.php';
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/Crons/class-scheduler.php';
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-ajax.php';
-
-    // Admin only.
-    if (is_admin()) {
-        require_once POD_AGGREGATOR_PLUGIN_DIR . 'admin/class-admin.php';
-        require_once POD_AGGREGATOR_PLUGIN_DIR . 'admin/class-settings.php';
-    }
-
-    // Frontend only.
-    if (!is_admin()) {
-        require_once POD_AGGREGATOR_PLUGIN_DIR . 'public/class-customizer-editor.php';
-        require_once POD_AGGREGATOR_PLUGIN_DIR . 'public/class-shortcodes.php';
-    }
-
-    // Load the loader after all classes are required.
-    require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-loader.php';
 
     // Initialize the loader.
     $loader = new POD_Aggregator\Loader();
@@ -131,8 +125,7 @@ register_deactivation_hook(
     __FILE__,
     function () {
         // Clear scheduled cron events.
-        wp_clear_scheduled_hook('pod_aggregator_sync_products');
-        wp_clear_scheduled_hook('pod_aggregator_sync_orders');
+        \POD_Aggregator\Crons\Scheduler::clear_crons();
 
         // Flush rewrite rules directly — 'init' has already run by deactivation.
         flush_rewrite_rules();

@@ -11,15 +11,11 @@
         "yoast/phpunit-polyfills": "^2.0"
     },
     "autoload": {
-        "psr-4": {
-            "POD_Aggregator\\": "includes/",
-            "POD_Aggregator\\Provider\\": "includes/providers/",
-            "POD_Aggregator\\WooCommerce\\": "includes/WooCommerce/",
-            "POD_Aggregator\\ProductCustomizer\\": "includes/product-customizer/",
-            "POD_Aggregator\\REST\\": "includes/REST/",
-            "POD_Aggregator\\Crons\\": "includes/Crons/",
-            "POD_Aggregator\\Admin\\": "admin/"
-        }
+        "classmap": [
+            "includes/",
+            "admin/",
+            "public/"
+        ]
     },
     "scripts": {
         "test": "phpunit",

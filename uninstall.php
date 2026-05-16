@@ -44,8 +44,6 @@ wp_clear_scheduled_hook('pod_aggregator_sync_products');
 wp_clear_scheduled_hook('pod_aggregator_sync_orders');
 
 // Remove custom tables.
-global $wpdb;
-
 $table_sync_log = $wpdb->base_prefix . 'pod_aggregator_sync_log';
 $table_designs  = $wpdb->base_prefix . 'pod_aggregator_designs';
 

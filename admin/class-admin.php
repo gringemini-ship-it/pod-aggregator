@@ -226,10 +226,15 @@ class Admin
     public function render_settings_page()
     {
         // Handled by Settings class via do_settings_sections.
+        // Use network admin edit URL when on multisite network admin,
+        // otherwise fall back to options.php for single-site.
+        $form_action = is_network_admin()
+            ? network_admin_url('edit.php?action=updatenetwork')
+            : 'options.php';
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('POD Aggregator Settings', 'pod-aggregator'); ?></h1>
-            <form action="options.php" method="post">
+            <form action="<?php echo esc_url($form_action); ?>" method="post">
                 <?php
                 settings_fields('pod_aggregator_settings');
                 do_settings_sections('pod_aggregator_settings');

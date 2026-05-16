@@ -18,7 +18,7 @@ import re
 import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path("/home/hermeswebui/workspace")
+PROJECT_ROOT = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SRC_DIRS = [PROJECT_ROOT / "includes", PROJECT_ROOT / "admin", PROJECT_ROOT / "public"]
 TEST_DIR = PROJECT_ROOT / "tests/phpunit/unit"
 

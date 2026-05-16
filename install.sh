@@ -37,6 +37,17 @@ git clone --depth=1 "$REPO" "$PLUGIN_TARGET/pod-aggregator"
 
 echo "[POD Aggregator] Cloned successfully!"
 
+# Install Composer dependencies (generates vendor/autoload.php for class autoloading).
+if command -v composer &> /dev/null; then
+    echo "[POD Aggregator] Installing Composer dependencies..."
+    cd "$PLUGIN_TARGET/pod-aggregator"
+    composer install --no-dev --no-interaction --quiet
+    cd - > /dev/null
+else
+    echo "[POD Aggregator] WARNING: Composer not found — classes will be loaded manually."
+    echo "  Install Composer (https://getcomposer.org) for PSR-4 autoloading."
+fi
+
 # Set permissions
 chown -R www-data:www-data "$PLUGIN_TARGET/pod-aggregator"
 chmod -R 755 "$PLUGIN_TARGET/pod-aggregator"
