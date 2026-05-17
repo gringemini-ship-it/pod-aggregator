@@ -19,6 +19,9 @@ class Printful_Adapter implements Provider_Interface
     /** @var string API key. */
     private $api_key;
 
+    /** @var int Store ID for order operations. */
+    private $store_id;
+
     /** @var string Base API URL. */
     private $base_url = 'https://api.printful.com';
 
@@ -34,7 +37,8 @@ class Printful_Adapter implements Provider_Interface
     public function __construct()
     {
         $settings = get_site_option('pod_aggregator_settings', []);
-        $this->api_key = $settings['printful_api_key'] ?? '';
+        $this->api_key  = $settings['printful_api_key'] ?? '';
+        $this->store_id = (int) ($settings['printful_store_id'] ?? 0);
     }
 
     // -------------------------------------------------------------------------
@@ -65,7 +69,7 @@ class Printful_Adapter implements Provider_Interface
     {
         return [
             'Authorization' => 'Bearer ' . $this->api_key,
-            'Content-Type' => 'application/json',
+            'Content-Type'  => 'application/json',
         ];
     }
 
@@ -140,8 +144,9 @@ class Printful_Adapter implements Provider_Interface
     /**
      * {@inheritDoc}
      *
-     * Uses Printful product catalog endpoint.
-     * Caches result for cache_ttl seconds.
+     * Fetches products from the Printful catalog (/products).
+     * Returns up to 200 products per sync. Caches for cache_ttl seconds.
+     * No store_id is required for catalog access.
      */
     public function get_products(): array
     {
@@ -162,41 +167,63 @@ class Printful_Adapter implements Provider_Interface
             return $cached;
         }
 
-        $result = $this->get('/store/products');
+        // Fetch catalog in batches to handle large catalogs.
+        $all_products = [];
+        $limit  = 100;
+        $offset = 0;
+        $max_batches = 3; // 300 products max per sync.
 
-        if (is_wp_error($result)) {
-            $this->log_sync('fetch_products', 'error', null, null, null, $result->get_error_message());
+        for ($batch = 0; $batch < $max_batches; $batch++) {
+            $result = $this->get('/products', ['limit' => $limit, 'offset' => $offset]);
+
+            if (is_wp_error($result)) {
+                $this->log_sync('fetch_products', 'error', null, null, null, $result->get_error_message());
+                break;
+            }
+
+            if (empty($result) || !is_array($result)) {
+                break;
+            }
+
+            // Normalize each product (catalog list has no variants — fetch on demand).
+            foreach ($result as $p) {
+                $all_products[] = $this->normalize_product($p);
+            }
+
+            // If fewer than limit, we've reached the end.
+            if (count($result) < $limit) {
+                break;
+            }
+
+            $offset += $limit;
+        }
+
+        if (empty($all_products)) {
+            $this->log_sync('fetch_products', 'error', null, null, null, 'Printful catalog returned no products');
             return [];
         }
 
-        if (empty($result)) {
-            $this->log_sync('fetch_products', 'error', null, null, null, 'Printful API returned an empty response');
-            return [];
-        }
+        set_transient($transient_key, $all_products, $this->cache_ttl);
 
-        $products = $result['items'] ?? $result;
-
-        // Normalize each product.
-        $normalized = array_map([$this, 'normalize_product'], $products);
-
-        set_transient($transient_key, $normalized, $this->cache_ttl);
-
-        $this->products_cache = $normalized;
-        return $normalized;
+        $this->products_cache = $all_products;
+        return $all_products;
     }
 
     /**
      * {@inheritDoc}
+     *
+     * Fetch a single product with full variant data from /products/{id}.
+     * Response is {product: {...}, variants: [{...}]}.
      */
     public function get_product(string $product_id)
     {
-        $result = $this->get('/store/products/' . rawurlencode($product_id));
+        $result = $this->get('/products/' . rawurlencode($product_id));
 
         if (is_wp_error($result)) {
             return $result;
         }
 
-        return $this->normalize_product($result);
+        return $this->normalize_product_detail($result);
     }
 
     /**
@@ -214,9 +241,9 @@ class Printful_Adapter implements Provider_Interface
     }
 
     /**
-     * Normalize a Printful product into our standard format.
+     * Normalize a Printful catalog product (list format — no variants).
      *
-     * @param array $p Raw Printful product.
+     * @param array $p Raw Printful product from /products list.
      * @return array Normalized array.
      */
     private function normalize_product(array $p): array
@@ -224,37 +251,80 @@ class Printful_Adapter implements Provider_Interface
         return [
             'provider'            => 'printful',
             'provider_product_id' => (string) ($p['id'] ?? ''),
-            'name'               => $p['name'] ?? '',
-            'description'        => $p['description'] ?? '',
-            'thumbnail_url'      => $p['image'] ?? '',
-            'variants'           => array_map([$this, 'normalize_variant'], $p['variants'] ?? []),
-            'model'              => $p['model'] ?? '',
-            'brand'              => $p['brand'] ?? '',
-            'category'           => $p['type'] ?? '',
+            'name'                => $p['title'] ?? $p['name'] ?? '',
+            'description'         => $p['description'] ?? '',
+            'thumbnail_url'       => $p['image'] ?? '',
+            'variants'            => [],
+            'model'               => $p['model'] ?? $p['type_name'] ?? '',
+            'brand'               => $p['brand'] ?? '',
+            'category'            => $p['type'] ?? '',
+            'files'               => $p['files'] ?? [],
+            'dimensions'          => $p['dimensions'] ?? [],
+            'variant_count'       => (int) ($p['variant_count'] ?? 0),
+        ];
+    }
+
+    /**
+     * Normalize a Printful product detail response (/products/{id}).
+     *
+     * Response format: {product: {...}, variants: [{...}, ...]}
+     *
+     * @param array $r Raw response from parse_response.
+     * @return array Normalized array with variants.
+     */
+    private function normalize_product_detail(array $r): array
+    {
+        // Detail response has product and variants as sibling keys.
+        $p = $r['product'] ?? $r;
+
+        $variants = [];
+        if (isset($r['variants']) && is_array($r['variants'])) {
+            $variants = $r['variants'];
+        } elseif (isset($p['variants']) && is_array($p['variants'])) {
+            $variants = $p['variants'];
+        }
+
+        return [
+            'provider'            => 'printful',
+            'provider_product_id' => (string) ($p['id'] ?? ''),
+            'name'                => $p['title'] ?? $p['name'] ?? '',
+            'description'         => $p['description'] ?? '',
+            'thumbnail_url'       => $p['image'] ?? '',
+            'variants'            => array_map([$this, 'normalize_variant'], $variants),
+            'model'               => $p['model'] ?? $p['type_name'] ?? '',
+            'brand'               => $p['brand'] ?? '',
+            'category'            => $p['type'] ?? '',
             'files'              => $p['files'] ?? [],
             'dimensions'         => $p['dimensions'] ?? [],
+            'variant_count'      => count($variants),
         ];
     }
 
     /**
      * Normalize a Printful variant.
      *
+     * In the current Printful API, variants have a 'price' field which is
+     * what Printful charges (the cost). There is no separate 'cost' field.
+     *
      * @param array $v Raw variant.
      * @return array
      */
     private function normalize_variant(array $v): array
     {
+        $price = (float) ($v['price'] ?? 0);
+
         return [
             'variant_id'   => (string) ($v['id'] ?? ''),
             'name'         => $v['name'] ?? '',
             'sku'          => $v['sku'] ?? '',
-            'price'        => (float) ($v['price'] ?? 0),
-            'cost'         => (float) ($v['cost'] ?? 0),
+            'price'        => $price,
+            'cost'         => $price,
             'currency'     => $v['currency'] ?? 'USD',
             'size'         => $v['size'] ?? '',
             'color'        => $v['color'] ?? '',
+            'color_code'   => $v['color_code'] ?? '',
             'image'        => $v['image'] ?? '',
-            'availability' => $v['availability'] ?? [],
+            'availability' => $v['availability_regions'] ?? [],
         ];
     }
 
@@ -265,12 +335,13 @@ class Printful_Adapter implements Provider_Interface
     /**
      * {@inheritDoc}
      *
-     * Printful returns cost in USD. If no retail_price is passed, returns cost.
-     * A typical WooCommerce markup is added automatically (+30%).
+     * Printful variant price is the fulfillment cost. Markup is applied
+     * by the importer; this method returns the calculated retail price.
      */
     public function calculate_price(array $variant, float $retail_price = 0.0): float
     {
-        $cost = (float) ($variant['cost'] ?? 0);
+        // In the current API, 'price' IS the cost.
+        $cost = (float) ($variant['cost'] ?? $variant['price'] ?? 0);
 
         if ($retail_price > 0) {
             return $retail_price;
@@ -286,8 +357,6 @@ class Printful_Adapter implements Provider_Interface
 
     /**
      * {@inheritDoc}
-     *
-     * Fetches product mockup images. Uses Printful's default product images.
      */
     public function get_mockups(string $product_id, array $options = []): array
     {
@@ -314,27 +383,27 @@ class Printful_Adapter implements Provider_Interface
     /**
      * {@inheritDoc}
      *
-     * Order data shape expected:
-     * [
-     *   'woo_order_id'       => int,
-     *   'items'              => [[
-     *     'variant_id'          => string,
-     *     'qty'                => int,
-     *     'design_data'        => array (print file info),
-     *   ]],
-     *   'shipping_address' => [
-     *     'name'    => string,
-     *     'address1'=> string,
-     *     'city'   => string,
-     *     'state'  => string,
-     *     'zip'    => string,
-     *     'country'=> string,
-     *   ],
-     * ]
+     * Submits an order to Printful. Requires a store_id (Manual Order / API
+     * platform store) configured in plugin settings.
      */
     public function submit_order(array $order_data)
     {
-        // Build Printful order payload.
+        if (empty($this->store_id)) {
+            $err = new \WP_Error(
+                'printful_no_store_id',
+                __('No Printful store ID configured. Add it in POD Aggregator → Settings.', 'pod-aggregator')
+            );
+            $this->log_sync(
+                'submit_order',
+                'error',
+                null,
+                $order_data['woo_order_id'] ?? null,
+                null,
+                $err->get_error_message()
+            );
+            return $err;
+        }
+
         $items = [];
         foreach ($order_data['items'] as $item) {
             $items[] = [
@@ -347,6 +416,7 @@ class Printful_Adapter implements Provider_Interface
         $address = $order_data['shipping_address'];
 
         $payload = [
+            'store_id'      => $this->store_id,
             'external_id'   => 'wc_order_' . $order_data['woo_order_id'],
             'shipping'      => 'STANDARD',
             'items'         => $items,
@@ -355,8 +425,8 @@ class Printful_Adapter implements Provider_Interface
                 'address1'   => sanitize_text_field($address['address1'] ?? ''),
                 'address2'   => sanitize_text_field($address['address2'] ?? ''),
                 'city'       => sanitize_text_field($address['city'] ?? ''),
-                'state'      => sanitize_text_field($address['state'] ?? ''),
-                'country'    => sanitize_text_field($address['country'] ?? ''),
+                'state_code' => sanitize_text_field($address['state'] ?? ''),
+                'country_code' => sanitize_text_field($address['country'] ?? ''),
                 'zip'        => sanitize_text_field($address['zip'] ?? ''),
                 'phone'      => sanitize_text_field($address['phone'] ?? ''),
                 'email'      => sanitize_email($address['email'] ?? ''),
@@ -380,22 +450,16 @@ class Printful_Adapter implements Provider_Interface
     /**
      * Build Printful file objects from design data.
      *
-     * @param array $design_data {
-     *   'url'      => string (remote print file URL),
-     *   'type'     => 'default'|'front'|'back'|'custom',
-     *   'position' => string ('front'|'back'|'custom'),
-     *   'options'  => array,
-     * }
+     * @param array $design_data
      * @return array
      */
     private function build_files(array $design_data): array
     {
         if (empty($design_data)) {
-            // Return placeholder — provider will use default.
             return [
                 [
-                    'type'      => 'default',
-                    'url'       => '',
+                    'type' => 'default',
+                    'url'  => '',
                 ],
             ];
         }
@@ -403,9 +467,9 @@ class Printful_Adapter implements Provider_Interface
         $files = [];
         foreach ((array) $design_data as $file) {
             $files[] = [
-                'type'      => $file['type'] ?? 'default',
-                'url'       => esc_url_raw($file['url'] ?? ''),
-                'options'   => $file['options'] ?? [],
+                'type'    => $file['type'] ?? 'default',
+                'url'     => esc_url_raw($file['url'] ?? ''),
+                'options' => $file['options'] ?? [],
             ];
         }
 
@@ -417,7 +481,12 @@ class Printful_Adapter implements Provider_Interface
      */
     public function get_order_status(string $external_order_id): array
     {
-        $result = $this->get('/orders/' . rawurlencode($external_order_id));
+        $args = [];
+        if ($this->store_id) {
+            $args['store_id'] = $this->store_id;
+        }
+
+        $result = $this->get('/orders/' . rawurlencode($external_order_id), $args);
 
         if (is_wp_error($result)) {
             return ['status' => 'error', 'message' => $result->get_error_message()];
@@ -446,12 +515,12 @@ class Printful_Adapter implements Provider_Interface
     /**
      * Log a sync event to our custom table.
      *
-     * @param string   $event_type    Event type (e.g. submit_order, fetch_products).
-     * @param string   $status        pending|success|error.
-     * @param string|null $external_id Provider's external order ID.
-     * @param int|null $order_id      WooCommerce order ID.
-     * @param array|null $payload     JSON-serializable payload.
-     * @param string|null $error_message Error message if error.
+     * @param string      $event_type
+     * @param string      $status
+     * @param string|null $external_id
+     * @param int|null    $order_id
+     * @param array|null  $payload
+     * @param string|null $error_message
      * @return void
      */
     private function log_sync(
@@ -466,7 +535,6 @@ class Printful_Adapter implements Provider_Interface
 
         $table = $wpdb->base_prefix . 'pod_aggregator_sync_log';
 
-        // Table might not exist yet during early init.
         if ($wpdb->get_var("SHOW TABLES LIKE '{$table}'") !== $table) {
             return;
         }
@@ -475,14 +543,14 @@ class Printful_Adapter implements Provider_Interface
             $table,
             [
                 'provider'      => 'printful',
-                'event_type'   => $event_type,
-                'external_id'  => $external_id,
-                'order_id'     => $order_id,
-                'status'       => $status,
-                'payload'      => $payload ? wp_json_encode($payload) : null,
-                'error_message'=> $error_message,
-                'created_at'   => current_time('mysql'),
-                'updated_at'   => current_time('mysql'),
+                'event_type'    => $event_type,
+                'external_id'   => $external_id,
+                'order_id'      => $order_id,
+                'status'        => $status,
+                'payload'       => $payload ? wp_json_encode($payload) : null,
+                'error_message' => $error_message,
+                'created_at'    => current_time('mysql'),
+                'updated_at'    => current_time('mysql'),
             ],
             ['%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s']
         );

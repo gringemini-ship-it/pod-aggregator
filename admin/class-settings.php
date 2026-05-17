@@ -52,6 +52,14 @@ class Settings
         );
 
         add_settings_field(
+            'printful_store_id',
+            __('Printful Store ID', 'pod-aggregator'),
+            [$this, 'render_printful_store_id_field'],
+            'pod_aggregator_settings',
+            'pod_aggregator_printful_section'
+        );
+
+        add_settings_field(
             'printful_default_markup',
             __('Default Markup (%)', 'pod-aggregator'),
             [$this, 'render_printful_markup_field'],
@@ -385,6 +393,25 @@ class Settings
         <?php
     }
 
+    public function render_printful_store_id_field()
+    {
+        $settings = get_site_option(self::SETTINGS_KEY, []);
+        $value    = isset($settings['printful_store_id']) ? esc_attr($settings['printful_store_id']) : '';
+        ?>
+        <input
+            type="text"
+            id="printful_store_id"
+            name="<?php echo esc_attr(self::SETTINGS_KEY); ?>[printful_store_id]"
+            value="<?php echo $value; ?>"
+            class="regular-text"
+            autocomplete="off"
+        />
+        <p class="description">
+            <?php esc_html_e('Required for order fulfillment. Find it in Printful Dashboard → Stores. Use a "Manual Order / API" type store.', 'pod-aggregator'); ?>
+        </p>
+        <?php
+    }
+
     public function render_printful_markup_field()
     {
         $settings = get_site_option(self::SETTINGS_KEY, []);
@@ -486,6 +513,9 @@ class Settings
         // Printful API key — any non-empty string.
         $api_key = sanitize_text_field(wp_unslash($input['printful_api_key'] ?? ''));
         $sanitized['printful_api_key'] = !empty($api_key) ? $api_key : '';
+
+        // Store ID — positive integer.
+        $sanitized['printful_store_id'] = absint($input['printful_store_id'] ?? 0);
 
         // Markup — integer 0–500.
         $sanitized['printful_default_markup'] = absint($input['printful_default_markup'] ?? 30);

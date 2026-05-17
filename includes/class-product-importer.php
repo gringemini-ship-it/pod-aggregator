@@ -72,8 +72,26 @@ class Product_Importer
         }
 
         $normalized = $this->get_normalized_data($pod_product_id);
-        if (empty($normalized['name']) || empty($normalized['variants'])) {
-            return new \WP_Error('invalid_data', __('Product data is incomplete.', 'pod-aggregator'));
+        if (empty($normalized['name'])) {
+            return new \WP_Error('invalid_data', __('Product data is missing a name.', 'pod-aggregator'));
+        }
+
+        // Products synced from the catalog list don't include variants.
+        // Fetch the full product detail (with variants) from the provider.
+        if (empty($normalized['variants']) && !empty($normalized['provider_product_id'])) {
+            $provider = \POD_Aggregator\pod_aggregator_get_provider($normalized['provider'] ?? 'printful');
+            if ($provider) {
+                $detail = $provider->get_product($normalized['provider_product_id']);
+                if (!is_wp_error($detail)) {
+                    $normalized = $detail;
+                    // Update the CPT with the full data so we don't re-fetch.
+                    update_post_meta($pod_product_id, '_pod_normalized_data', wp_json_encode($normalized));
+                }
+            }
+        }
+
+        if (empty($normalized['variants'])) {
+            return new \WP_Error('invalid_data', __('Product has no variants to import.', 'pod-aggregator'));
         }
 
         $variants = $normalized['variants'];
