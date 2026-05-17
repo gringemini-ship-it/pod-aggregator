@@ -142,23 +142,22 @@ class Loader
         });
 
         // ---- Admin ----
-        if (is_admin()) {
-            $admin = new \POD_Aggregator\Admin\Admin();
-            $this->add_action('admin_menu', $admin, 'add_menu_pages');
-            $this->add_action('admin_init', $admin, 'register_settings');
-            $this->add_action('wp_ajax_pod_manual_sync', $admin, 'ajax_manual_sync_products');
+        $admin = new \POD_Aggregator\Admin\Admin();
+        $this->add_action('admin_menu', $admin, 'add_menu_pages');
+        $this->add_action('admin_init', $admin, 'register_settings');
+        $this->add_action('wp_ajax_pod_manual_sync', $admin, 'ajax_manual_sync_products');
+        $this->add_filter('plugin_action_links_' . POD_AGGREGATOR_PLUGIN_BASENAME, $admin, 'add_action_links');
 
-            $settings = new \POD_Aggregator\Admin\Settings();
-            $this->add_action('admin_init', $settings, 'register_settings');
+        $settings = new \POD_Aggregator\Admin\Settings();
+        $this->add_action('admin_init', $settings, 'register_settings');
 
-            // Preset design templates admin UI (P3-A).
-            $presets = new \POD_Aggregator\Admin\Preset_Templates();
-            $this->add_action('admin_menu', $presets, 'register_menu');
-            $this->add_action('admin_enqueue_scripts', $presets, 'enqueue_assets');
-            $this->add_action('wp_ajax_pod_save_preset', $presets, 'ajax_save_preset');
-            $this->add_action('wp_ajax_pod_delete_preset', $presets, 'ajax_delete_preset');
-            $this->add_filter('rest_api_init', $presets, 'register_rest_routes');
-        }
+        // Preset design templates admin UI (P3-A).
+        $presets = new \POD_Aggregator\Admin\Preset_Templates();
+        $this->add_action('admin_menu', $presets, 'register_menu');
+        $this->add_action('admin_enqueue_scripts', $presets, 'enqueue_assets');
+        $this->add_action('wp_ajax_pod_save_preset', $presets, 'ajax_save_preset');
+        $this->add_action('wp_ajax_pod_delete_preset', $presets, 'ajax_delete_preset');
+        $this->add_filter('rest_api_init', $presets, 'register_rest_routes');
 
         // ---- REST API (Webhooks) ----
         $this->add_filter('rest_api_init', new \POD_Aggregator\REST\Controller(), 'register_routes');

@@ -25,6 +25,28 @@ class Admin
     }
 
     /**
+     * Add Settings and Dashboard links to the plugin row.
+     *
+     * @param array $links Existing action links.
+     * @return array
+     */
+    public function add_action_links(array $links): array
+    {
+        $cap = $this->cap();
+        $url = is_network_admin()
+            ? network_admin_url('admin.php?page=pod-aggregator-settings')
+            : admin_url('admin.php?page=pod-aggregator-settings');
+
+        $links['settings'] = sprintf(
+            '<a href="%s">%s</a>',
+            esc_url($url),
+            esc_html__('Settings', 'pod-aggregator')
+        );
+
+        return $links;
+    }
+
+    /**
      * Add admin menu pages.
      *
      * @return void
