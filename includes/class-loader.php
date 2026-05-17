@@ -210,18 +210,25 @@ class Loader
 
         // ---- Register all collected hooks ----
         foreach ($this->filters as $hook) {
+            // Direct callables (Closures, etc.) have null component.
+            $callback = $hook['component'] === null
+                ? $hook['callback']
+                : [$hook['component'], $hook['callback']];
             add_filter(
                 $hook['hook'],
-                [$hook['component'], $hook['callback']],
+                $callback,
                 $hook['priority'],
                 $hook['accepted_args']
             );
         }
 
         foreach ($this->actions as $hook) {
+            $callback = $hook['component'] === null
+                ? $hook['callback']
+                : [$hook['component'], $hook['callback']];
             add_action(
                 $hook['hook'],
-                [$hook['component'], $hook['callback']],
+                $callback,
                 $hook['priority'],
                 $hook['accepted_args']
             );
