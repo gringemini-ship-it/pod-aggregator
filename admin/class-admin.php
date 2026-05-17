@@ -268,6 +268,7 @@ class Admin
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('POD Aggregator Settings', 'pod-aggregator'); ?></h1>
+            <?php settings_errors(\POD_Aggregator\Admin\Settings::SETTINGS_KEY); ?>
             <form action="<?php echo esc_url($form_action); ?>" method="post">
                 <?php
                 settings_fields('pod_aggregator_settings');

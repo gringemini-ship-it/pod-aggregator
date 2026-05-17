@@ -31,7 +31,7 @@ class Settings
                 'type'              => 'array',
                 'sanitize_callback' => [$this, 'sanitize_settings'],
                 'default'           => [],
-                'network'           => true,
+                'network'           => is_multisite(),
             ]
         );
 
@@ -509,12 +509,10 @@ class Settings
         }
 
         // Validate Printful API key with a quick test request.
-        // If validation fails, clear the key so it is not saved.
+        // Warn on failure but still save the key — the user may need to
+        // fix server connectivity or whitelist the IP separately.
         if (!empty($sanitized['printful_api_key'])) {
-            $valid = $this->validate_printful_key($sanitized['printful_api_key']);
-            if (!$valid) {
-                $sanitized['printful_api_key'] = '';
-            }
+            $this->validate_printful_key($sanitized['printful_api_key']);
         }
 
         // Printify API token.
@@ -588,6 +586,12 @@ class Settings
             return false;
         }
 
+        add_settings_error(
+            self::SETTINGS_KEY,
+            'printful_api_valid',
+            __('Printful API key validated successfully.', 'pod-aggregator'),
+            'success'
+        );
         return true;
     }
 }
