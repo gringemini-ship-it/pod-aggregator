@@ -31,42 +31,60 @@ class Loader
     /**
      * Register a WordPress action hook.
      *
-     * @param string   $hook          Hook name.
-     * @param object   $component     Component object.
-     * @param string   $callback      Method name on component.
-     * @param int      $priority      Priority (default: 10).
-     * @param int      $accepted_args Number of accepted args (default: 1).
+     * Supports two calling conventions:
+     *   add_action('hook', $object, 'method')           — object + method name
+     *   add_action('hook', $callable, $priority, $args) — direct callable (Closure, etc.)
+     *
+     * @param string        $hook          Hook name.
+     * @param object|callable $component   Component object, or callable if used directly.
+     * @param string|int    $callback      Method name on component, or priority if callable.
+     * @param int           $priority      Priority (default: 10).
+     * @param int           $accepted_args Number of accepted args (default: 1).
      * @return void
      */
-    public function add_action($hook, $component, $callback, $priority = 10, $accepted_args = 1)
+    public function add_action($hook, $component, $callback = null, $priority = 10, $accepted_args = 1)
     {
+        if ($callback === null || is_int($callback)) {
+            // Direct callable: add_action('hook', $callable, $priority, $accepted_args)
+            $this->actions = $this->add($this->actions, $hook, null, $component, $callback ?? $priority, $priority);
+            return;
+        }
         $this->actions = $this->add($this->actions, $hook, $component, $callback, $priority, $accepted_args);
     }
 
     /**
      * Register a WordPress filter hook.
      *
-     * @param string   $hook          Hook name.
-     * @param object   $component     Component object.
-     * @param string   $callback      Method name on component.
-     * @param int      $priority      Priority (default: 10).
-     * @param int      $accepted_args Number of accepted args (default: 1).
+     * Supports two calling conventions:
+     *   add_filter('hook', $object, 'method')           — object + method name
+     *   add_filter('hook', $callable, $priority, $args) — direct callable (Closure, etc.)
+     *
+     * @param string        $hook          Hook name.
+     * @param object|callable $component   Component object, or callable if used directly.
+     * @param string|int    $callback      Method name on component, or priority if callable.
+     * @param int           $priority      Priority (default: 10).
+     * @param int           $accepted_args Number of accepted args (default: 1).
      * @return void
      */
-    public function add_filter($hook, $component, $callback, $priority = 10, $accepted_args = 1)
+    public function add_filter($hook, $component, $callback = null, $priority = 10, $accepted_args = 1)
     {
+        if ($callback === null || is_int($callback)) {
+            // Direct callable: add_filter('hook', $callable, $priority, $accepted_args)
+            $this->filters = $this->add($this->filters, $hook, null, $component, $callback ?? $priority, $priority);
+            return;
+        }
         $this->filters = $this->add($this->filters, $hook, $component, $callback, $priority, $accepted_args);
     }
 
     /**
      * Internal helper to register a hook.
      *
-     * @param array    $hooks         Existing hooks array.
-     * @param string   $hook          Hook name.
-     * @param object   $component     Component object.
-     * @param string   $callback      Method name.
-     * @param int      $priority      Priority.
-     * @param int      $accepted_args Accepted args.
+     * @param array         $hooks         Existing hooks array.
+     * @param string        $hook          Hook name.
+     * @param object|null   $component     Component object, or null for direct callables.
+     * @param string|callable $callback    Method name, or the callable itself.
+     * @param int           $priority      Priority.
+     * @param int           $accepted_args Accepted args.
      * @return array
      */
     private function add(array $hooks, $hook, $component, $callback, $priority, $accepted_args): array
