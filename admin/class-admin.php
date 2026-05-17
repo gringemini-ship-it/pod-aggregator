@@ -15,17 +15,29 @@ namespace POD_Aggregator\Admin;
 class Admin
 {
     /**
-     * Add network admin menu pages.
+     * Return the appropriate capability for the current installation.
+     *
+     * @return string
+     */
+    private function cap(): string
+    {
+        return is_multisite() ? 'manage_network' : 'manage_options';
+    }
+
+    /**
+     * Add admin menu pages.
      *
      * @return void
      */
     public function add_menu_pages()
     {
+        $cap = $this->cap();
+
         // Top-level menu.
         add_menu_page(
             __('POD Aggregator', 'pod-aggregator'),
             __('POD Aggregator', 'pod-aggregator'),
-            'manage_network',
+            $cap,
             'pod-aggregator',
             [$this, 'render_dashboard_page'],
             'dashicons-images-alt',
@@ -37,7 +49,7 @@ class Admin
             'pod-aggregator',
             __('Dashboard', 'pod-aggregator'),
             __('Dashboard', 'pod-aggregator'),
-            'manage_network',
+            $cap,
             'pod-aggregator',
             [$this, 'render_dashboard_page']
         );
@@ -47,7 +59,7 @@ class Admin
             'pod-aggregator',
             __('POD Products', 'pod-aggregator'),
             __('POD Products', 'pod-aggregator'),
-            'manage_network',
+            $cap,
             'edit.php?post_type=pod_product',
             null
         );
@@ -57,7 +69,7 @@ class Admin
             'pod-aggregator',
             __('Settings', 'pod-aggregator'),
             __('Settings', 'pod-aggregator'),
-            'manage_network',
+            $cap,
             'pod-aggregator-settings',
             [$this, 'render_settings_page']
         );
@@ -67,7 +79,7 @@ class Admin
             'pod-aggregator',
             __('Sync Log', 'pod-aggregator'),
             __('Sync Log', 'pod-aggregator'),
-            'manage_network',
+            $cap,
             'pod-aggregator-sync-log',
             [$this, 'render_sync_log_page']
         );
@@ -422,7 +434,7 @@ class Admin
     {
         check_ajax_referer('pod_manual_sync', 'nonce');
 
-        if (!current_user_can('manage_network')) {
+        if (!current_user_can($this->cap())) {
             wp_send_json_error(['message' => __('Permission denied.', 'pod-aggregator')], 403);
             return;
         }
