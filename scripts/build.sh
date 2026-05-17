@@ -100,11 +100,13 @@ EOF
 
 cmd_check() {
     log "Running pre-build checks..."
-    (cd "$PLUGIN_SLUG" && php_check && phpcs_check)
+    (php_check && phpcs_check)
     log "All checks passed"
 }
 
 cmd_build() {
+    need zip
+
     local version="$1"
     [ -z "$version" ] && die "Version number required. Run: $0 <version>"
 
@@ -122,14 +124,17 @@ cmd_build() {
     log "Staging files into $TRUNK_DIR..."
     mkdir -p "$TRUNK_DIR"
 
-    # Copy plugin files, excluding dev artifacts
+    # Copy plugin files, excluding dev artifacts.
+    # IMPORTANT: no trailing slash on directory sources — trailing slash
+    # copies only the CONTENTS (flattening subdirectories), while without
+    # the slash it copies the directory itself, preserving the tree.
     rsync -a \
         pod-aggregator.php \
         uninstall.php \
-        admin/ \
-        includes/ \
-        public/ \
-        assets/ \
+        admin \
+        includes \
+        public \
+        assets \
         "$TRUNK_DIR/" \
         "${EXCLUDE_PATTERNS[@]}"
 
@@ -137,13 +142,14 @@ cmd_build() {
     # (WordPress.org doesn't use Composer for runtime deps)
     rm -f "$TRUNK_DIR/composer.json" "$TRUNK_DIR/composer.lock"
 
-    # Create the ZIP
+    # Create the ZIP from trunk/ so files are at the ZIP root
+    # (WordPress expects plugin files at root, not inside a trunk/ wrapper).
     log "Creating $DIST_FILE..."
-    (cd pod-aggregator && zip -r ../"$DIST_FILE" . -x "\
+    (cd "$TRUNK_DIR" && zip -r ../../"$DIST_FILE" . -x "\
 .git/*" "*.git*" "*.md" "*.txt" "tests/*" "phpunit*" "composer.json" "composer.lock" \
 "vendor/*" "node_modules/*" "scripts/*" "references/*" "*.map" "*.log" "phpcs.xml*" ".phpcs.xml*" \
 ".phpunit.result.cache" 2>/dev/null || \
-zip -r "$DIST_FILE" . -x ".git/*" "*.md" "*.txt" "tests/*" "phpunit*" "composer.json" \
+zip -r ../../"$DIST_FILE" . -x ".git/*" "*.md" "*.txt" "tests/*" "phpunit*" "composer.json" \
 "composer.lock" "vendor/*" "node_modules/*" "scripts/*" "references/*" "*.map" "*.log" \
 "phpcs.xml*" ".phpcs.xml*" ".phpunit.result.cache" 2>/dev/null)
 
@@ -173,8 +179,6 @@ zip -r "$DIST_FILE" . -x ".git/*" "*.md" "*.txt" "tests/*" "phpunit*" "composer.
 # ----------------------------------------------------------------------
 
 main() {
-    need zip
-
     cd "$(dirname "$0")/.." || die "Cannot cd to parent of scripts/"
 
     local cmd="${1:-}"

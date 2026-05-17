@@ -28,6 +28,20 @@ define('POD_AGGREGATOR_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('POD_AGGREGATOR_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('POD_AGGREGATOR_PLUGIN_BASENAME', plugin_basename(__FILE__));
 
+// Verify plugin directory structure is intact (catches broken builds where
+// rsync trailing slashes flattened subdirectories into a single level).
+if (!is_dir(POD_AGGREGATOR_PLUGIN_DIR . 'includes')) {
+    wp_die(
+        esc_html__(
+            'POD Aggregator installation is incomplete — the includes/ directory is missing. '
+            . 'This usually means the build script flattened the directory structure. '
+            . 'Please rebuild the plugin ZIP and reinstall.',
+            'pod-aggregator'
+        ),
+        'Plugin Installation Error'
+    );
+}
+
 // Load Composer autoloader if present (must be top-level so classes
 // are available during activation/deactivation hooks).
 if (file_exists(POD_AGGREGATOR_PLUGIN_DIR . 'vendor/autoload.php')) {
