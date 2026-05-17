@@ -159,6 +159,12 @@ class Loader
         $this->add_action('wp_ajax_pod_delete_preset', $presets, 'ajax_delete_preset');
         $this->add_filter('rest_api_init', $presets, 'register_rest_routes');
 
+        // Product import — catalog browser and WC import.
+        $import = new \POD_Aggregator\Admin\Product_Import();
+        $this->add_action('admin_menu', $import, 'register_menu');
+        $this->add_action('admin_enqueue_scripts', $import, 'enqueue_assets');
+        $this->add_action('wp_ajax_pod_import_product', $import, 'ajax_import_product');
+
         // ---- REST API (Webhooks) ----
         $this->add_filter('rest_api_init', new \POD_Aggregator\REST\Controller(), 'register_routes');
 

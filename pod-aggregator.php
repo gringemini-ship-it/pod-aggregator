@@ -3,7 +3,7 @@
  * Plugin Name:       POD Aggregator
  * Plugin URI:        https://github.com/gringemini-ship-it/pod-aggregator
  * Description:       Connect your WordPress store to multiple Print-on-Demand providers (Printful, Printify, Gelato and more). Sync products, personalize with the built-in customizer, and automate order fulfillment.
- * Version:           1.0.7
+ * Version:           1.0.8
  * Requires at least: 6.9
  * Requires PHP:      7.4
  * Author:            POD Aggregator Team
@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants.
-define('POD_AGGREGATOR_VERSION', '1.0.7');
+define('POD_AGGREGATOR_VERSION', '1.0.8');
 define('POD_AGGREGATOR_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('POD_AGGREGATOR_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('POD_AGGREGATOR_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -66,9 +66,11 @@ require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/product-customizer/class-rest
 require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/REST/class-controller.php';
 require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/Crons/class-scheduler.php';
 require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-ajax.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-product-importer.php';
 require_once POD_AGGREGATOR_PLUGIN_DIR . 'admin/class-admin.php';
 require_once POD_AGGREGATOR_PLUGIN_DIR . 'admin/class-settings.php';
 require_once POD_AGGREGATOR_PLUGIN_DIR . 'admin/class-preset-templates.php';
+require_once POD_AGGREGATOR_PLUGIN_DIR . 'admin/class-product-import.php';
 require_once POD_AGGREGATOR_PLUGIN_DIR . 'public/class-customizer-editor.php';
 require_once POD_AGGREGATOR_PLUGIN_DIR . 'public/class-shortcodes.php';
 require_once POD_AGGREGATOR_PLUGIN_DIR . 'includes/class-loader.php';

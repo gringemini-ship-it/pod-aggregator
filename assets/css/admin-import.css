@@ -1,0 +1,33 @@
+/* POD Aggregator — Product Import page styles */
+
+.pod-import-wrap .pod-import-filters {
+    margin: 15px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.pod-import-wrap .pod-import-filters label {
+    font-weight: 500;
+}
+
+.pod-import-wrap .pod-import-filters select {
+    margin-left: 4px;
+}
+
+.pod-import-table td {
+    vertical-align: middle;
+}
+
+.pod-import-table .pod-import-status {
+    min-width: 120px;
+}
+
+.pod-import-table .pod-import-status .button {
+    margin-top: 4px;
+}
+
+.pod-import-btn:disabled {
+    opacity: 0.6;
+}

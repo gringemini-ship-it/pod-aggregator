@@ -119,10 +119,14 @@ class Printful_Adapter implements Provider_Interface
         }
 
         $code = wp_remote_retrieve_response_code($response);
-        $body = json_decode(wp_remote_retrieve_body($response), true);
+        $raw  = wp_remote_retrieve_body($response);
+        $body = json_decode($raw, true);
 
         if ($code >= 400) {
             $msg = $body['error']['message'] ?? "HTTP {$code}";
+            if ($raw && !isset($body['error']['message'])) {
+                $msg .= ' — ' . substr(wp_strip_all_tags($raw), 0, 200);
+            }
             return new \WP_Error('printful_api_error', $msg);
         }
 
@@ -141,6 +145,11 @@ class Printful_Adapter implements Provider_Interface
      */
     public function get_products(): array
     {
+        if (empty($this->api_key)) {
+            $this->log_sync('fetch_products', 'error', null, null, null, 'No Printful API key configured');
+            return [];
+        }
+
         if (!empty($this->products_cache)) {
             return $this->products_cache;
         }
@@ -156,9 +165,12 @@ class Printful_Adapter implements Provider_Interface
         $result = $this->get('/store/products');
 
         if (is_wp_error($result)) {
-            $this->log_sync('fetch_products', 'error', null, null, [
-                'error' => $result->get_error_message(),
-            ]);
+            $this->log_sync('fetch_products', 'error', null, null, null, $result->get_error_message());
+            return [];
+        }
+
+        if (empty($result)) {
+            $this->log_sync('fetch_products', 'error', null, null, null, 'Printful API returned an empty response');
             return [];
         }
 

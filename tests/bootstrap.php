@@ -528,6 +528,13 @@ if (!function_exists('did_action')) {
 // Mock get_post / wp_insert_post / wp_update_post / wp_delete_post
 if (!function_exists('get_post')) {
     function get_post($post = null, $output = 'OBJECT') {
+        if ($post && isset($GLOBALS['_pod_posts'][$post])) {
+            $p = $GLOBALS['_pod_posts'][$post];
+            if ($output === 'ARRAY_A') {
+                return ['ID' => $post, 'post_title' => $p['post_title'] ?? '', 'post_type' => $p['post_type'] ?? '', 'post_status' => $p['post_status'] ?? 'publish'];
+            }
+            return (object) ['ID' => $post, 'post_title' => $p['post_title'] ?? '', 'post_type' => $p['post_type'] ?? '', 'post_status' => $p['post_status'] ?? 'publish'];
+        }
         return null;
     }
 }
@@ -535,7 +542,9 @@ if (!function_exists('get_post')) {
 if (!function_exists('wp_insert_post')) {
     function wp_insert_post(array $postarr, bool $wp_error = false) {
         static $id = 100;
-        return $wp_error ? new WP_Error() : $id++;
+        $new_id = $id++;
+        $GLOBALS['_pod_posts'][$new_id] = $postarr;
+        return $wp_error ? new WP_Error() : $new_id;
     }
 }
 
@@ -559,13 +568,22 @@ if (!function_exists('get_posts')) {
 
 if (!function_exists('update_post_meta')) {
     function update_post_meta(int $post_id, string $key, $value): bool {
+        $GLOBALS['_pod_postmeta'][$post_id][$key] = $value;
         return true;
     }
 }
 
 if (!function_exists('get_post_meta')) {
     function get_post_meta(int $post_id, string $key = '', bool $single = false) {
-        return $single ? '' : [''];
+        $meta = $GLOBALS['_pod_postmeta'][$post_id] ?? [];
+        if ($key === '') {
+            return $single ? ($meta ?: '') : ($meta ?: ['']);
+        }
+        $val = $meta[$key] ?? null;
+        if ($val === null) {
+            return $single ? '' : [''];
+        }
+        return $single ? $val : [$val];
     }
 }
 
@@ -739,23 +757,26 @@ if (!function_exists('update_option')) {
 }
 
 // Mock wp_send_json_success / wp_send_json_error
+// Throw a catchable exception instead of calling exit so tests can inspect the response.
+class POD_Test_Ajax_Response extends \RuntimeException {
+    public bool $success;
+    public $data;
+    public function __construct(bool $success, $data = null) {
+        $this->success = $success;
+        $this->data = $data;
+        parent::__construct($success ? 'AJAX success' : 'AJAX error');
+    }
+}
+
 if (!function_exists('wp_send_json_success')) {
     function wp_send_json_success($data = null, int $status = null): void {
-        echo json_encode(['success' => true, 'data' => $data]);
-        if ($status) {
-            http_response_code($status);
-        }
-        exit;
+        throw new POD_Test_Ajax_Response(true, $data);
     }
 }
 
 if (!function_exists('wp_send_json_error')) {
     function wp_send_json_error($data = null, int $status = null): void {
-        echo json_encode(['success' => false, 'data' => $data]);
-        if ($status) {
-            http_response_code($status);
-        }
-        exit;
+        throw new POD_Test_Ajax_Response(false, $data);
     }
 }
 
@@ -895,6 +916,125 @@ if (!defined('ABSPATH')) {
     define('ABSPATH', '/tmp/wptest/');
 }
 
+// --- Additional mocks needed by Product_Importer and Product_Import ---
+
+if (!function_exists('wp_kses_post')) {
+    function wp_kses_post(string $content): string {
+        return strip_tags($content, '<p><br><strong><em><ul><ol><li><a><img>');
+    }
+}
+
+if (!function_exists('wp_set_object_terms')) {
+    function wp_set_object_terms(int $object_id, $terms, string $taxonomy, bool $append = false) {
+        return [];
+    }
+}
+
+if (!function_exists('wc_sanitize_taxonomy_name')) {
+    function wc_sanitize_taxonomy_name(string $name): string {
+        return preg_replace('/[^a-z0-9_-]/', '', strtolower($name));
+    }
+}
+
+if (!function_exists('wc_attribute_taxonomy_name')) {
+    function wc_attribute_taxonomy_name(string $name): string {
+        return 'pa_' . wc_sanitize_taxonomy_name($name);
+    }
+}
+
+if (!function_exists('taxonomy_exists')) {
+    function taxonomy_exists(string $taxonomy): bool {
+        return false;
+    }
+}
+
+if (!function_exists('term_exists')) {
+    function term_exists($term, string $taxonomy = '', int $parent = 0) {
+        return null;
+    }
+}
+
+if (!function_exists('wp_insert_term')) {
+    function wp_insert_term(string $term, string $taxonomy, array $args = []) {
+        static $id = 200;
+        return ['term_id' => $id++, 'term_taxonomy_id' => $id++];
+    }
+}
+
+if (!function_exists('set_post_thumbnail')) {
+    function set_post_thumbnail(int $post_id, int $thumb_id): bool {
+        return true;
+    }
+}
+
+if (!function_exists('wc_format_decimal')) {
+    function wc_format_decimal(float $number, $dp = false): string {
+        return number_format($number, wc_get_price_decimals(), '.', '');
+    }
+}
+
+if (!function_exists('wc_get_price_decimals')) {
+    function wc_get_price_decimals(): int {
+        return 2;
+    }
+}
+
+if (!function_exists('media_handle_sideload')) {
+    function media_handle_sideload(array $file_array, int $post_id, string $desc = null, array $post_data = []) {
+        static $id = 300;
+        return $id++;
+    }
+}
+
+if (!function_exists('download_url')) {
+    function download_url(string $url, int $timeout = 300) {
+        // Simulate a temp file path.
+        $tmp = tempnam(sys_get_temp_dir(), 'pod_test_dl_');
+        file_put_contents($tmp, 'mock_image_data');
+        return $tmp;
+    }
+}
+
+if (!function_exists('wp_basename')) {
+    function wp_basename(string $path, string $suffix = ''): string {
+        $base = basename($path);
+        if ($suffix && substr($base, -strlen($suffix)) === $suffix) {
+            $base = substr($base, 0, -strlen($suffix));
+        }
+        return $base;
+    }
+}
+
+if (!function_exists('get_edit_post_link')) {
+    function get_edit_post_link(int $post_id = 0, string $context = 'display'): ?string {
+        return 'http://example.com/wp-admin/post.php?post=' . $post_id . '&action=edit';
+    }
+}
+
+if (!function_exists('get_permalink')) {
+    function get_permalink(int $post_id = 0, bool $leavename = false): string {
+        return 'http://example.com/?p=' . $post_id;
+    }
+}
+
+if (!function_exists('paginate_links')) {
+    function paginate_links(array $args = []): string {
+        return '<span class="page-numbers">1</span>';
+    }
+}
+
+if (!function_exists('esc_js')) {
+    function esc_js(string $text): string {
+        return addslashes($text);
+    }
+}
+
+if (!function_exists('is_multisite')) {
+    function is_multisite(): bool {
+        return false;
+    }
+}
+
 // -----------------------------------------------------------------------------
 // Load all plugin class files AFTER all mocks are defined.
 // Files use class- prefix naming which doesn't match PSR-4 expected file names,
@@ -923,3 +1063,5 @@ require_once $plugin_dir . 'admin/class-preset-templates.php';
 // and is only needed for frontend rendering, not unit tests.
 require_once $plugin_dir . 'public/class-shortcodes.php';
 require_once $plugin_dir . 'includes/class-loader.php';
+require_once $plugin_dir . 'includes/class-product-importer.php';
+require_once $plugin_dir . 'admin/class-product-import.php';

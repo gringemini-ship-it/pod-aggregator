@@ -551,7 +551,7 @@ class Settings
     private function validate_printful_key(string $api_key): bool
     {
         $response = wp_remote_get(
-            'https://api.printful.com/store',
+            add_query_arg(['limit' => 1], 'https://api.printful.com/store/products'),
             [
                 'headers' => [
                     'Authorization' => 'Bearer ' . $api_key,
