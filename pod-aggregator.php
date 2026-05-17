@@ -201,5 +201,3 @@ function pod_aggregator_create_tables()
     // Store that tables were created.
     update_site_option('pod_aggregator_tables_created', true);
 }
-
-/**
