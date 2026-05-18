@@ -464,13 +464,53 @@ class Product_Importer
         require_once ABSPATH . 'wp-admin/includes/file.php';
         require_once ABSPATH . 'wp-admin/includes/image.php';
 
+        // Download the file first so we can detect its true MIME type.
         $tmp = download_url($url, 30);
         if (is_wp_error($tmp)) {
             return $tmp;
         }
 
+        // Build a filename with a proper extension from the actual file content.
+        $filename = wp_basename(parse_url($url, PHP_URL_PATH)) ?: 'product-image';
+
+        // If the filename has no recognized image extension, detect and add one.
+        // Printful CDN URLs have no extension (e.g. ...fe2c_l), which causes
+        // WordPress media_handle_sideload to fail because it can't detect MIME.
+        $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        $image_exts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+
+        if (!in_array($ext, $image_exts, true)) {
+            // Detect MIME from the actual file contents.
+            $mime = false;
+            if (function_exists('mime_content_type')) {
+                $mime = mime_content_type($tmp);
+            } elseif (function_exists('finfo_open')) {
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                if ($finfo) {
+                    $mime = finfo_file($finfo, $tmp);
+                    finfo_close($finfo);
+                }
+            }
+
+            if ($mime && str_starts_with($mime, 'image/')) {
+                $ext = str_replace('image/', '', $mime);
+                if ($ext === 'jpeg') {
+                    $ext = 'jpg';
+                }
+            } else {
+                $ext = 'jpg';
+            }
+
+            // Rename the temp file with the extension.
+            $new_tmp = $tmp . '.' . $ext;
+            if (rename($tmp, $new_tmp)) {
+                $tmp = $new_tmp;
+            }
+            $filename .= '.' . $ext;
+        }
+
         $file_array = [
-            'name'     => wp_basename(parse_url($url, PHP_URL_PATH)) ?: 'product-image.jpg',
+            'name'     => sanitize_file_name($filename),
             'tmp_name' => $tmp,
         ];
 
