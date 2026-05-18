@@ -3,7 +3,7 @@
  * Plugin Name:       POD Aggregator
  * Plugin URI:        https://github.com/gringemini-ship-it/pod-aggregator
  * Description:       Connect your WordPress store to multiple Print-on-Demand providers (Printful, Printify, Gelato and more). Sync products, personalize with the built-in customizer, and automate order fulfillment.
- * Version:           1.0.9
+ * Version:           1.0.10
  * Requires at least: 6.9
  * Requires PHP:      7.4
  * Author:            POD Aggregator Team
@@ -23,7 +23,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants.
-define('POD_AGGREGATOR_VERSION', '1.0.9');
+define('POD_AGGREGATOR_VERSION', '1.0.10');
 define('POD_AGGREGATOR_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('POD_AGGREGATOR_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('POD_AGGREGATOR_PLUGIN_BASENAME', plugin_basename(__FILE__));

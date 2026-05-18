@@ -622,8 +622,10 @@ composer install --no-interaction
 | Value objects (`Design`, `Design_Element`) | Immutable, easy to test, no hidden state |
 | Provider interface (`POD_Provider`) | Adding a new provider = implement the interface + add settings |
 | CPT for designs (`pod_design`) | Design data independent of WooCommerce order data |
+| CPT for synced products (`pod_product`) | Normalized catalog data stored as CPT meta; import creates WC variable products |
 | Settings API (not custom options page) | Leverages WordPress's built-in security (nonces, capabilities, sanitization) |
 | Multi-adapter pattern | Each provider is isolated — one provider's bug can't break another |
+| Printful Store ID requirement | Printful requires a "Manual Order / API" type store for order submission; catalog browsing works without it |
 
 ### Request Lifecycle — Frontend
 

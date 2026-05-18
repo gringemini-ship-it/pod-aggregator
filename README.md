@@ -22,7 +22,7 @@ POD Aggregator bridges WooCommerce with Print-on-Demand providers so store owner
 | Feature | Description |
 |---------|-------------|
 | **Multi-Provider Support** | Connect Printful, Printify, and Gelato simultaneously |
-| **Provider Catalog Import** | Browse and import products from each provider via the admin panel |
+| **Provider Catalog Import** | Sync provider catalogs, then browse and import products as WooCommerce variable products with one click |
 | **Product Sync** | Scheduled sync (configurable interval) keeps WooCommerce prices/inventory aligned per provider |
 | **Visual Product Customizer** | Front-end design editor for text and image personalisation |
 | **Per-Product Pricing** | Configurable markup % per product, per provider (base cost + markup) |
@@ -32,8 +32,8 @@ POD Aggregator bridges WooCommerce with Print-on-Demand providers so store owner
 | **Manual Sync (UI)** | AJAX-powered "Sync Now" button in the admin dashboard for any provider |
 | **WP-CLI Commands** | `wp pod syncProducts`, `wp pod syncOrders`, `wp pod testConnection` |
 | **300 DPI Print File Generation** | Generated server-side at checkout using GD library |
-| **Multisite Ready** | Network-wide activation with per-blog product import |
-| **Custom Post Types** | `pod_product` CPT (design data), `pod_design` CPT (saved designs) |
+| **Single-Site & Multisite** | Works on both single-site and multisite WordPress installations |
+| **Custom Post Types** | `pod_product` CPT (synced catalog data), `pod_design` CPT (saved designs) |
 | **REST API** | Design save/load/delete, print file generation, sync triggers via authenticated REST endpoints |
 
 ---
@@ -51,11 +51,11 @@ POD Aggregator bridges WooCommerce with Print-on-Demand providers so store owner
 
 ### Provider Account Setup
 
-| Provider | Sign Up | API Key Location |
-|----------|---------|----------------|
-| **Printful** | [printful.com](https://www.printful.com) | Account → API → Create API key |
-| **Printify** | [printify.com](https://printify.com) | My Profile → API → Generate token |
-| **Gelato** | [gelato.com](https://gelato.com) | Settings → API → Create API key |
+| Provider | Sign Up | API Key Location | Additional Setup |
+|----------|---------|------------------|------------------|
+| **Printful** | [printful.com](https://www.printful.com) | Account → API → Create API key | Create a "Manual Order / API" store in Printful Dashboard → Stores |
+| **Printify** | [printify.com](https://printify.com) | My Profile → API → Generate token | Shop ID from Printify → My Store |
+| **Gelato** | [gelato.com](https://gelato.com) | Settings → API → Create API key | — |
 
 Check your PHP extensions:
 
@@ -84,7 +84,7 @@ Each provider has its own tab in **Settings → POD Aggregator**. All three can 
 
 | Provider | Products | Orders | Webhooks |
 |----------|----------|--------|----------|
-| Printful | ✅ Catalog sync | ✅ Submit + track | ✅ HMAC-SHA256 signature |
+| Printful | ✅ Catalog sync (full catalog via categories) | ✅ Submit + track | ✅ HMAC-SHA256 signature |
 | Printify | ✅ Catalog sync | ✅ Submit + track | ✅ HMAC-SHA256 signature |
 | Gelato | ✅ Catalog sync | ✅ Submit + track | ✅ Bearer token auth |
 

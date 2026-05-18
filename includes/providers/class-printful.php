@@ -144,9 +144,14 @@ class Printful_Adapter implements Provider_Interface
     /**
      * {@inheritDoc}
      *
-     * Fetches products from the Printful catalog (/products).
-     * Returns up to 200 products per sync. Caches for cache_ttl seconds.
-     * No store_id is required for catalog access.
+     * Fetches the full Printful catalog by iterating through product categories.
+     *
+     * The Printful /products endpoint returns only ~98 featured products when
+     * called without a category_id, and ignores the offset parameter entirely.
+     * To get the complete catalog (300+ products), we must query each product
+     * category individually and deduplicate.
+     *
+     * Caches for cache_ttl seconds. No store_id required for catalog access.
      */
     public function get_products(): array
     {
@@ -167,35 +172,49 @@ class Printful_Adapter implements Provider_Interface
             return $cached;
         }
 
-        // Fetch catalog in batches to handle large catalogs.
         $all_products = [];
-        $limit  = 100;
-        $offset = 0;
-        $max_batches = 3; // 300 products max per sync.
+        $seen_ids     = [];
 
-        for ($batch = 0; $batch < $max_batches; $batch++) {
-            $result = $this->get('/products', ['limit' => $limit, 'offset' => $offset]);
-
-            if (is_wp_error($result)) {
-                $this->log_sync('fetch_products', 'error', null, null, null, $result->get_error_message());
-                break;
-            }
-
-            if (empty($result) || !is_array($result)) {
-                break;
-            }
-
-            // Normalize each product (catalog list has no variants — fetch on demand).
-            foreach ($result as $p) {
+        // Helper: ingest a product page, skipping duplicates.
+        $ingest = function (array $page) use (&$all_products, &$seen_ids) {
+            foreach ($page as $p) {
+                $pid = (string) ($p['id'] ?? '');
+                if ($pid === '' || isset($seen_ids[$pid])) {
+                    continue;
+                }
+                $seen_ids[$pid] = true;
                 $all_products[] = $this->normalize_product($p);
             }
+        };
 
-            // If fewer than limit, we've reached the end.
-            if (count($result) < $limit) {
-                break;
+        // 1. Fetch the main catalog page (no category filter). This returns
+        //    ~98 featured products that span all categories.
+        $main = $this->get('/products', ['limit' => 100]);
+        if (!is_wp_error($main) && is_array($main)) {
+            $ingest($main);
+        }
+
+        // 2. Discover product categories.
+        $categories = $this->get_categories();
+        if (!empty($categories)) {
+            $product_cats = $this->filter_product_categories($categories);
+
+            foreach ($product_cats as $cat_id) {
+                $page = $this->get('/products', [
+                    'limit'       => 100,
+                    'category_id' => $cat_id,
+                ]);
+
+                if (is_wp_error($page)) {
+                    continue;
+                }
+
+                if (!is_array($page) || empty($page)) {
+                    continue;
+                }
+
+                $ingest($page);
             }
-
-            $offset += $limit;
         }
 
         if (empty($all_products)) {
@@ -207,6 +226,75 @@ class Printful_Adapter implements Provider_Interface
 
         $this->products_cache = $all_products;
         return $all_products;
+    }
+
+    /**
+     * Fetch all Printful product categories.
+     *
+     * @return array Category objects, each with id, parent_id, title.
+     */
+    private function get_categories(): array
+    {
+        $result = $this->get('/categories');
+
+        if (is_wp_error($result)) {
+            return [];
+        }
+
+        return $result['categories'] ?? [];
+    }
+
+    /**
+     * Filter categories down to real product categories.
+     *
+     * Excludes:
+     *   - "Collections" (parent_id 116) and their children
+     *   - "Brands" (parent_id 159) and their children
+     *   - "All *" aggregator categories (ids 226-230, 277)
+     *
+     * These contain duplicate products already visible in the real
+     * product categories (parents 1-5) and their subcategories.
+     *
+     * @param array $categories Raw categories from /categories.
+     * @return int[] Category IDs to query for products.
+     */
+    private function filter_product_categories(array $categories): array
+    {
+        // Build parent lookup: parent_id → [child_ids].
+        $children = [];
+        foreach ($categories as $c) {
+            $pid = (int) ($c['parent_id'] ?? 0);
+            $children[$pid][] = (int) $c['id'];
+        }
+
+        // Walk from the top-level product categories (1-5) and collect
+        // all descendant category IDs recursively.
+        $aggregator_ids  = [226, 227, 228, 229, 230, 277];
+
+        $product_cat_ids = [];
+
+        $walk = function (int $parent_id) use (&$walk, $children, &$product_cat_ids, $aggregator_ids) {
+            if (!isset($children[$parent_id])) {
+                return;
+            }
+            foreach ($children[$parent_id] as $child_id) {
+                if (in_array($child_id, $aggregator_ids, true)) {
+                    continue;
+                }
+                $product_cat_ids[] = $child_id;
+                // Recurse into grandchildren.
+                $walk($child_id);
+            }
+        };
+
+        // Start from the five top-level product category parents.
+        // Include the parents themselves (they are parent_id=0 entries).
+        foreach ([1, 2, 3, 4, 5] as $root) {
+            $product_cat_ids[] = $root;
+            $walk($root);
+        }
+
+        return array_unique($product_cat_ids);
     }
 
     /**

@@ -46,25 +46,22 @@ phpinfo();
 wp plugin install /path/to/pod-aggregator.zip --activate-network
 ```
 
-### Step 2 — Network Activate (Multisite Only)
+### Step 2 — Activate the Plugin
 
-If running WordPress Multisite, you **must** use **Network Activate**:
+**Single-site:** Go to **Plugins → Installed Plugins** and click **Activate** below "POD Aggregator".
 
-1. Go to **My Sites → Network Admin → Plugins**
-2. Find "POD Aggregator" and click **Network Activate**
-
-Do NOT activate it on individual sub-sites — CPTs and REST routes will not register correctly.
+**Multisite:** Go to **My Sites → Network Admin → Plugins**, find "POD Aggregator", and click **Network Activate**. Do NOT activate on individual sub-sites — CPTs and REST routes will not register correctly.
 
 ### Step 3 — Verify the Plugin Loaded
 
-After activation, you should see a new menu under **My Sites → Network Admin → Settings** (or **Settings** on single-site):
+After activation, you should see a new top-level admin menu **POD Aggregator** with these submenus:
 
-- **POD Aggregator** — Provider settings (Printful, Printify, Gelato API keys; default markup; sync frequency)
+- **Dashboard** — Provider status with "Sync Now" buttons and sync log
+- **Settings** — Provider API keys, Store IDs, markup percentages, sync intervals
+- **Import Products** — Browse synced provider catalogs and import to WooCommerce
+- **Preset Templates** — Manage pre-made design templates for the customizer
 
-And under the **My Sites** menu (multisite) or top-level admin menu:
-
-- **POD Products** — Browse and import from each provider's catalog
-- **POD Designs** — Manage saved design templates
+On multisite, settings are managed under **Network Admin → Settings → POD Aggregator**.
 
 ---
 
@@ -79,9 +76,12 @@ Go to **Settings → POD Aggregator**. You will see three tabs: **Printful**, **
 1. Go to the **Printful** tab
 2. Log into Printful → **[Account → API](https://www.printful.com/dashboard)**
 3. Copy your API key and paste it into the **Printful API Key** field
-4. The plugin verifies the key automatically on save — a green indicator confirms the connection
-5. Copy the **Webhook URL** shown in the section description (you'll paste it into Printful's dashboard in Step 2)
+4. Enter your **Printful Store ID** — find this in Printful Dashboard → **Stores**. You must create a store of type **"Manual Order / API"** (not "WooCommerce"). The store ID is the numeric ID shown next to the store name.
+5. The plugin verifies the key automatically on save — a green indicator confirms the connection
+6. Copy the **Webhook URL** shown in the section description (you'll paste it into Printful's dashboard in Step 2)
 
+> **Store ID note:** The Printful Store ID is required for order fulfillment. Without it, orders cannot be submitted to Printful. Only "Manual Order / API" type stores can be used — WooCommerce-type stores do not support the API endpoints this plugin uses.
+>
 > **Security note:** Your API key is stored as a WordPress site option (or network option on multisite). You can also set it via a constant in `wp-config.php`:
 > ```php
 > define('POD_AGGREGATOR_PRINTFUL_API_KEY', 'your_key_here');
@@ -152,19 +152,35 @@ Webhooks keep WooCommerce order statuses in sync with your provider. Without web
 
 ---
 
-### 3. Import Products
+### 3. Sync and Import Products
 
-1. Go to **POD Products → Import**
-2. Select the **Provider** tab (Printful / Printify / Gelato) for the catalog you want to browse
-3. Browse by category or search for a specific product
-4. Click **Import** next to any product you want to add to your store
-5. The product is created as a WooCommerce product with:
-   - Product name and description from the provider
-   - Base cost from the provider
-   - Your configured markup added to the price
-6. Imported products appear in **WooCommerce → Products**
+The product import workflow has two stages:
 
-To set a per-product markup before importing, adjust the **Markup %** column for each product, then click **Import Selected**.
+**Stage 1 — Sync provider catalog:**
+
+1. Go to **POD Aggregator → Dashboard** in the admin menu
+2. Click the **Sync Now** button next to your configured provider
+3. The plugin fetches the provider's product catalog and stores it as `pod_product` CPT entries
+4. You can also use WP-CLI: `wp pod syncProducts --provider=printful`
+5. Synced products appear under **POD Products** in the admin menu
+
+> **Printful catalog size:** The Printful `/products` endpoint returns ~98 featured products when called without a category filter. The plugin automatically iterates through all product categories to assemble the full catalog (300+ products). A full sync may take 30–60 seconds due to the number of API calls required.
+
+**Stage 2 — Import to WooCommerce:**
+
+1. Go to **Import Products** under the POD Aggregator menu
+2. Filter by provider (Printful / Printify / Gelato) to see synced products
+3. Browse the catalog and click **Import to Store** on any product
+4. The product is created as a WooCommerce variable product with:
+   - Product name, description, and thumbnail from the provider
+   - All variants (size/color combinations) with individual prices
+   - Your configured markup applied to each variant's cost
+   - Product images downloaded from the provider's CDN
+5. Imported products appear in **WooCommerce → Products** and are immediately available in your store
+
+> **Image import:** Provider CDN URLs sometimes lack file extensions (particularly Printful). The plugin detects the image MIME type from file contents so images import correctly regardless of URL format. If images fail to import, ensure your server has the `finfo` or `mime_content_type` PHP extension enabled.
+
+**After import**, you can edit the WooCommerce product normally — change prices, descriptions, categories, etc. The plugin tracks the link between the `pod_product` and the WooCommerce product via post meta, so you won't accidentally import the same product twice.
 
 ---
 

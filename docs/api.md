@@ -224,7 +224,7 @@ Copy the URL for each provider from **Settings → POD Aggregator** and register
 
 | Provider | Webhook URL | Auth Method |
 |----------|-------------|-------------|
-| Printful | `https://yoursite.com/wp-json/pod-aggregator/v1/webhook?provider=printful` | HMAC-SHA256 signature |
+| Printful | `https://yoursite.com/wp-json/pod-aggregator/v1/webhook?provider=printful` | HMAC-SHA256 signature (requires Store ID for order operations) |
 | Printify | `https://yoursite.com/wp-json/pod-aggregator/v1/webhook?provider=printify` | HMAC-SHA256 signature |
 | Gelato | `https://yoursite.com/wp-json/pod-aggregator/v1/webhook?provider=gelato` | Bearer token |
 

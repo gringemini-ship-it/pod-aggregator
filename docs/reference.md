@@ -225,10 +225,11 @@ All `$_POST` / `$_GET` input is sanitised early using WordPress functions:
 ```php
 // From class-settings.php sanitize callback:
 $data = wp_unslash($_POST['pod_aggregator']);
-$clean['printful_api_key']   = sanitize_key($data['printful_api_key']);
-$clean['printify_api_token'] = sanitize_text_field(trim($data['printify_api_token']));
-$clean['gelato_api_key']     = sanitize_text_field(trim($data['gelato_api_key']));
-$clean['default_markup']     = absint($data['default_markup']);
+$clean['printful_api_key']    = sanitize_key($data['printful_api_key']);
+$clean['printful_store_id']   = absint($data['printful_store_id'] ?? 0);
+$clean['printify_api_token']  = sanitize_text_field(trim($data['printify_api_token']));
+$clean['gelato_api_key']      = sanitize_text_field(trim($data['gelato_api_key']));
+$clean['default_markup']      = absint($data['default_markup']);
 $clean['sync_interval_hours'] = absint($data['sync_interval_hours']);
 // Markup clamped to 0–500%
 $clean['default_markup'] = min(500, max(0, $clean['default_markup']));
@@ -337,6 +338,7 @@ if (!hash_equals($stored_api_key, $token)) {
 | Provider | Possible Causes | Fix |
 |----------|----------------|-----|
 | Printful | API key wrong, key revoked, insufficient permissions | Re-copy key from Printful Dashboard → API |
+| Printful | Missing or wrong Store ID | Enter a valid Store ID in Settings → POD Aggregator → Printful. Must be a "Manual Order / API" type store. |
 | Printify | API token expired or wrong | Regenerate token at Printify → My Profile → API |
 | Gelato | API key wrong or workspace suspended | Check Gelato → Settings → API |
 
@@ -345,11 +347,23 @@ Verify with WP-CLI:
 wp pod testConnection --provider=printify
 ```
 
+### Printful Order Submission Fails with "store_id is required"
+
+Printful's order submission endpoint requires a `store_id` in the request payload. This field was added in plugin version 1.0.8.
+
+**Fix:**
+1. Log into Printful → **Dashboard → Stores**
+2. Create a new store of type **"Manual Order / API"** (not "WooCommerce")
+3. Copy the numeric store ID
+4. Go to **Settings → POD Aggregator → Printful** and enter the Store ID
+5. Click **Save Changes**
+
 ### Products Not Appearing in the Import List
 
 **Causes:**
 - Provider API key is not configured — set it in **Settings → POD Aggregator** → respective tab
-- Provider API is returning an error — check PHP error log
+- Products have not been synced yet — go to **Dashboard** and click **Sync Now**, or run `wp pod syncProducts`
+- Provider API is returning an error — check the Sync Log at **POD Aggregator → Sync Log**
 - Network issue — the site server must be able to reach the provider's API endpoint
 
 Test connectivity from the server:
@@ -362,6 +376,28 @@ curl -I https://api.gelato.com/v2/
 
 # Printful
 curl -I https://api.printful.com/
+```
+
+### Printful Products Seem Limited
+
+The Printful `/products` endpoint returns only ~98 products when queried without a `category_id` filter. The plugin automatically discovers all product categories via the `/categories` endpoint and iterates through each one to assemble the complete catalog. If you're still seeing fewer products than expected:
+
+- Ensure the sync completed fully — a full Printful catalog sync makes ~80 API calls and may take 30–60 seconds
+- Check the Sync Log for any per-category errors
+- Run `wp pod syncProducts --provider=printful` from the command line for a longer timeout
+
+### Product Images Not Importing
+
+Some provider CDNs (particularly Printful) serve product images with URLs that lack file extensions (e.g., `https://files.cdn.printful.com/.../04f318b62ba2242360baeb2fcc89fe2c_l`). WordPress's media sideload function requires a recognized image extension to detect MIME type.
+
+The plugin handles this by:
+1. Downloading the file to a temp location
+2. Detecting the actual MIME type from file contents (using `mime_content_type()` or `finfo_file()`)
+3. Renaming the temp file with the correct extension before sideloading
+
+If images still fail to import, ensure your PHP installation has the `fileinfo` extension enabled:
+```bash
+php -m | grep fileinfo
 ```
 
 ### Design Preview Not Loading on Product Page
@@ -484,11 +520,22 @@ The 300 DPI generation scales the design to 300 DPI server-side. If the original
 
 ---
 
-## Multisite Support
+## Single-Site & Multisite Support
 
-### Network Activation
+### Single-Site Installation
 
-**Required.** Activate the plugin from **My Sites → Network Admin → Plugins → Network Activate**. Individual blog activation does not register CPTs or REST routes for the network.
+On a standard WordPress installation, activate the plugin normally via **Plugins → Installed Plugins**. Settings are stored as regular WordPress options and the admin menu appears as a top-level **POD Aggregator** menu.
+
+### Network Activation (Multisite)
+
+On multisite, activate the plugin from **My Sites → Network Admin → Plugins → Network Activate**. Individual blog activation does not register CPTs or REST routes for the network.
+
+### Admin Menu Differences
+
+| Environment | Settings Location | Capability Required |
+|-------------|------------------|-------------------|
+| Single-site | POD Aggregator → Settings | `manage_options` |
+| Multisite | Network Admin → Settings → POD Aggregator | `manage_network` |
 
 ### Per-Blog Product Import
 
@@ -514,13 +561,18 @@ add_filter('pod_aggregator_sync_cron_network_wide', '__return_true');
 
 ### Settings Storage
 
-Settings are stored as **network options** (not per-blog options) when the plugin is network-activated. The Settings API page is shown under **Network Admin → Settings**.
+Settings are stored as **network options** (on multisite) or **regular options** (on single-site). The admin page adapts accordingly.
 
-Each provider's settings (API keys, webhook secrets) are stored as network options:
-- `pod_aggregator_printful_api_key`
-- `pod_aggregator_printify_api_token`
-- `pod_aggregator_gelato_api_key`
-- `pod_aggregator_settings` (serialized array of all settings)
+Each provider's settings (API keys, webhook secrets, store IDs) are stored in the `pod_aggregator_settings` option array:
+- `printful_api_key` — Printful API key
+- `printful_store_id` — Printful store ID (required for order fulfillment)
+- `printful_webhook_secret` — Printful webhook HMAC secret
+- `printify_api_token` — Printify API token
+- `printify_shop_id` — Printify shop ID
+- `printify_webhook_secret` — Printify webhook HMAC secret
+- `gelato_api_key` — Gelato API key
+- `default_markup` — Global default markup percentage (0–500)
+- `sync_interval_hours` — Cron sync interval
 
 Or set via constants in `wp-config.php` (constants take precedence):
 - `POD_AGGREGATOR_PRINTFUL_API_KEY`
